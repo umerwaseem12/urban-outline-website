@@ -1,0 +1,478 @@
+.uo-confirm {
+  --uo-orange: #db7657;
+  --uo-ink: #242321;
+  --uo-muted: #77736e;
+  --uo-line: #eeece8;
+  min-height: 100vh;
+  background: #f7f7f5;
+  color: var(--uo-ink);
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+}
+
+.uo-confirm * {
+  box-sizing: border-box;
+}
+
+.uo-confirm__header {
+  min-height: 76px;
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #fff;
+  border-bottom: 1px solid var(--uo-line);
+}
+
+.uo-confirm__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  color: var(--uo-ink);
+  text-decoration: none;
+}
+
+.uo-confirm__brand img {
+  width: 43px;
+  height: 43px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.uo-confirm__brand strong,
+.uo-confirm__brand small {
+  display: block;
+  letter-spacing: 0.08em;
+}
+
+.uo-confirm__brand strong {
+  font-size: 13px;
+}
+
+.uo-confirm__brand small {
+  margin-top: 3px;
+  color: var(--uo-muted);
+  font-size: 9px;
+}
+
+.uo-confirm__headerNote {
+  color: var(--uo-muted);
+  font-size: 13px;
+}
+
+.uo-confirm__main {
+  width: min(100% - 36px, 1050px);
+  margin: 0 auto;
+  padding: 38px 0 48px;
+}
+
+.uo-confirm__hero {
+  padding: 36px 24px 28px;
+  background: #fff;
+  border: 1px solid var(--uo-line);
+  border-radius: 20px;
+  text-align: center;
+  box-shadow: 0 8px 28px rgba(40, 35, 30, 0.035);
+}
+
+.uo-confirm__successIcon {
+  width: 60px;
+  height: 60px;
+  margin: 0 auto 17px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: #37845f;
+  border-radius: 50%;
+}
+
+.uo-confirm__successIcon svg {
+  width: 31px;
+  height: 31px;
+}
+
+.uo-confirm__eyebrow {
+  margin: 0 0 7px;
+  color: var(--uo-orange);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+.uo-confirm__hero h1 {
+  margin: 0;
+  font-size: clamp(26px, 4vw, 36px);
+  letter-spacing: -0.04em;
+}
+
+.uo-confirm__intro {
+  margin: 10px 0 0;
+  color: var(--uo-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.uo-confirm__delivery {
+  width: fit-content;
+  margin: 23px auto 0;
+  padding: 12px 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #fff7f3;
+  border: 1px solid #f4e3dc;
+  border-radius: 12px;
+  text-align: left;
+}
+
+.uo-confirm__truckIcon svg {
+  width: 27px;
+  height: 27px;
+  color: var(--uo-orange);
+}
+
+.uo-confirm__delivery small,
+.uo-confirm__delivery strong {
+  display: block;
+}
+
+.uo-confirm__delivery small {
+  margin-bottom: 3px;
+  color: var(--uo-muted);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+}
+
+.uo-confirm__delivery strong {
+  font-size: 14px;
+}
+
+.uo-confirm__timeline {
+  width: min(100%, 570px);
+  margin: 29px auto 0;
+  display: grid;
+  grid-template-columns: 1fr 48px 1fr 48px 1fr;
+  align-items: start;
+}
+
+.uo-confirm__step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  color: #a19d97;
+}
+
+.uo-confirm__step > span {
+  width: 29px;
+  height: 29px;
+  display: grid;
+  place-items: center;
+  background: #f0efed;
+  border-radius: 50%;
+  font-size: 11px;
+}
+
+.uo-confirm__step > span svg {
+  width: 16px;
+  height: 16px;
+}
+
+.uo-confirm__step small {
+  font-size: 10px;
+}
+
+.uo-confirm__step--done,
+.uo-confirm__step--active {
+  color: var(--uo-ink);
+}
+
+.uo-confirm__step--done > span {
+  color: #fff;
+  background: #37845f;
+}
+
+.uo-confirm__step--active > span {
+  color: #fff;
+  background: var(--uo-orange);
+}
+
+.uo-confirm__rail {
+  height: 2px;
+  margin-top: 14px;
+  background: #e9e7e3;
+}
+
+.uo-confirm__rail--done {
+  background: #37845f;
+}
+
+.uo-confirm__layout {
+  margin-top: 20px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 315px;
+  align-items: start;
+  gap: 18px;
+}
+
+.uo-confirm__side {
+  display: grid;
+  gap: 18px;
+}
+
+.uo-confirm__card {
+  padding: 23px;
+  background: #fff;
+  border: 1px solid var(--uo-line);
+  border-radius: 16px;
+}
+
+.uo-confirm__cardHeading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.uo-confirm__cardHeading h2,
+.uo-confirm__summaryTitle {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+}
+
+.uo-confirm__orderRef {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+}
+
+.uo-confirm__orderRef span {
+  color: var(--uo-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.uo-confirm__orderRef button {
+  padding: 0;
+  color: var(--uo-orange);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+}
+
+.uo-confirm__items {
+  margin-top: 20px;
+}
+
+.uo-confirm__item {
+  padding: 14px 0;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  border-top: 1px solid var(--uo-line);
+}
+
+.uo-confirm__itemImage {
+  width: 60px;
+  height: 68px;
+  flex: 0 0 60px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  color: var(--uo-orange);
+  background: #f4f1ee;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.uo-confirm__itemImage img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.uo-confirm__itemInfo {
+  min-width: 0;
+  flex: 1;
+}
+
+.uo-confirm__itemInfo strong,
+.uo-confirm__itemInfo span {
+  display: block;
+}
+
+.uo-confirm__itemInfo strong {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+}
+
+.uo-confirm__itemInfo span {
+  margin-top: 6px;
+  color: var(--uo-muted);
+  font-size: 12px;
+}
+
+.uo-confirm__itemPrice {
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.uo-confirm__customer {
+  padding-top: 17px;
+  border-top: 1px solid var(--uo-line);
+}
+
+.uo-confirm__customer h3 {
+  margin: 0 0 9px;
+  font-size: 13px;
+}
+
+.uo-confirm__customer p,
+.uo-confirm__muted {
+  margin: 5px 0;
+  color: var(--uo-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.uo-confirm__paymentStatus {
+  width: fit-content;
+  margin: 13px 0 0;
+  padding: 6px 10px;
+  color: #6c5a2c;
+  background: #faf4e5;
+  border-radius: 20px;
+  font-size: 11px;
+}
+
+.uo-confirm__summaryTitle {
+  margin-bottom: 18px;
+}
+
+.uo-confirm__summaryRow,
+.uo-confirm__summaryTotal {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+}
+
+.uo-confirm__summaryRow {
+  margin: 12px 0;
+  color: var(--uo-muted);
+}
+
+.uo-confirm__summaryTotal {
+  margin-top: 16px;
+  padding-top: 15px;
+  border-top: 1px solid var(--uo-line);
+  font-size: 14px;
+}
+
+.uo-confirm__summaryTotal strong {
+  font-size: 17px;
+}
+
+.uo-confirm__notice {
+  margin-top: 20px;
+  padding: 17px 20px;
+  color: #67594f;
+  background: #fff7f3;
+  border: 1px solid #f4e3dc;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.uo-confirm__continue {
+  width: fit-content;
+  margin: 23px auto 0;
+  padding: 13px 19px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #fff;
+  background: var(--uo-orange);
+  border-radius: 9px;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 0.2s ease, transform 0.2s ease;
+  border: 0;
+cursor: pointer;
+font-family: inherit;
+}
+
+
+.uo-confirm__continue:hover {
+  background: #c96749;
+  transform: translateY(-1px);
+}
+
+.uo-confirm__footer {
+  margin: 18px 0 0;
+  color: var(--uo-muted);
+  text-align: center;
+  font-size: 11px;
+}
+
+@media (max-width: 760px) {
+  .uo-confirm__main {
+    width: min(100% - 24px, 600px);
+    padding-top: 22px;
+  }
+
+  .uo-confirm__hero {
+    padding: 28px 16px 22px;
+    border-radius: 16px;
+  }
+
+  .uo-confirm__layout {
+    grid-template-columns: 1fr;
+  }
+
+  .uo-confirm__side {
+    grid-template-columns: 1fr;
+  }
+
+  .uo-confirm__card {
+    padding: 19px;
+  }
+
+  .uo-confirm__header {
+    padding: 11px 14px;
+  }
+
+  .uo-confirm__headerNote {
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 420px) {
+  .uo-confirm__timeline {
+    grid-template-columns: 1fr 24px 1fr 24px 1fr;
+  }
+
+  .uo-confirm__step small {
+    font-size: 9px;
+  }
+
+  .uo-confirm__orderRef span {
+    font-size: 9px;
+  }
+
+  .uo-confirm__cardHeading h2 {
+    font-size: 16px;
+  }
+}
+.uo-confirm .uo-confirm__hero,
+.uo-confirm .uo-confirm__card {
+  border: 1px solid #db7657;
+}
