@@ -24,23 +24,34 @@ const userSchema = new mongoose.Schema(
       select: false,
     },
     resetTokenHash: {
-  type: String,
-  select: false,
-},
-resetTokenExpiresAt: {
-  type: Date,
-  select: false,
-},
+      type: String,
+      select: false,
+    },
+    resetTokenExpiresAt: {
+      type: Date,
+      select: false,
+    },
+    emailVerified: {
+      type: Boolean,
+    },
+    verifyTokenHash: {
+      type: String,
+      select: false,
+    },
+    verifyTokenExpiresAt: {
+      type: Date,
+      select: false,
+    },
     googleId: {
       type: String,
       unique: true,
       sparse: true,
     },
     profilePicture: {
-  type: String,
-  default: '',
-},
-  customPhoto: {
+      type: String,
+      default: '',
+    },
+    customPhoto: {
       type: Buffer,
       select: false,
     },
@@ -53,7 +64,6 @@ resetTokenExpiresAt: {
       enum: ['customer', 'admin'],
       default: 'customer',
     },
-
   },
   { timestamps: true },
 )

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { API_BASE } from '../config'
 
 const inputClass =
   'mt-2 w-full rounded-xl border border-[#ded8d2] bg-white px-4 py-3 text-sm text-[#24211f] outline-none focus:border-[#db7657]'
@@ -68,9 +69,9 @@ export default function PasswordReset({
 
     setBusy(true)
 
-    try {
+   try {
       const response = await fetch(
-        `http://localhost:5000/api/auth/${
+        `${API_BASE}/api/auth/${
           token ? 'reset-password' : 'forgot-password'
         }`,
         {
@@ -84,7 +85,6 @@ export default function PasswordReset({
           ),
         },
       )
-
       const data = await response.json()
 
       if (!response.ok) {

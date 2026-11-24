@@ -251,6 +251,44 @@ function ProductCard({
     url.searchParams.delete('resetToken')
     window.history.replaceState(null, '', url.pathname + url.search + url.hash)
   }, [resetToken])
+    const [verifyToken, setVerifyToken] = useState(
+    () => new URLSearchParams(window.location.search).get('verifyToken') || '',
+  )
+  const [verifyStatus, setVerifyStatus] = useState('')
+  const [verifyMessage, setVerifyMessage] = useState('')
+  const verifyStarted = useRef(false)
+
+  useEffect(() => {
+    if (!verifyToken || verifyStarted.current) return
+    verifyStarted.current = true
+
+    const url = new URL(window.location.href)
+    url.searchParams.delete('verifyToken')
+    window.history.replaceState(null, '', url.pathname + url.search + url.hash)
+
+    setVerifyStatus('checking')
+
+    fetch(API_BASE + '/api/auth/verify-email', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: verifyToken }),
+    })
+      .then(async (response) => {
+        const result = await response.json().catch(() => ({}))
+        setVerifyStatus(response.ok ? 'success' : 'error')
+        setVerifyMessage(
+          result.message ||
+            (response.ok
+              ? 'Email verified. Please sign in.'
+              : 'Verification link invalid or expired.'),
+        )
+      })
+      .catch(() => {
+        setVerifyStatus('error')
+        setVerifyMessage('Server se connection nahi ho raha. Dobara try karein.')
+      })
+  }, [verifyToken])
   const [isDark, setIsDark] = useState(
     () =>
       typeof window !== 'undefined' &&
@@ -437,6 +475,45 @@ setCartToast({ productName: product.name })
       />
     )
   }
+   if (verifyToken) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#f3f1ee] px-4 text-[#24211f]">
+        <div className="w-full max-w-md rounded-[28px] border border-[#db7657] bg-white p-8 text-center shadow-lg">
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#db7657]">
+            Urban Outline
+          </p>
+
+          <h1 className="mt-3 text-2xl font-semibold">
+            {verifyStatus === 'success'
+              ? 'Email verified'
+              : verifyStatus === 'error'
+                ? 'Verification failed'
+                : 'Verifying your email...'}
+          </h1>
+
+          {verifyMessage && (
+            <p className="mt-3 text-sm leading-6 text-[#706a65]">
+              {verifyMessage}
+            </p>
+          )}
+
+          {verifyStatus && verifyStatus !== 'checking' && (
+            <button
+              type="button"
+              onClick={() => {
+                setVerifyToken('')
+                setAccountOpen(true)
+              }}
+              className="mt-6 w-full rounded-xl bg-[#252220] px-5 py-4 text-sm font-semibold text-white transition-colors hover:bg-[#db7657]"
+            >
+              {verifyStatus === 'success' ? 'Sign in' : 'Back to sign in'}
+            </button>
+          )}
+        </div>
+      </main>
+    )
+  }
+
  if (accountOpen) {
   return (
     <>
@@ -751,14 +828,17 @@ className="inline-flex items-center py-2 text-sm font-bold uppercase tracking-[0
             >
               {isDark ? <Sun size={18} /> : <Moon size={18} />}
             </button>
-<button
-  type="button"
-  onClick={() => setAccountOpen(true)}
-  aria-label="Account"
-  className="hidden h-10 w-10 items-center justify-center transition-colors hover:text-brand sm:flex"
->
-  <UserRound size={19} strokeWidth={1.7} />
-</button>
+            
+{!headerUser && (
+  <button
+    type="button"
+    onClick={() => setAccountOpen(true)}
+    aria-label="Account"
+    className="flex h-10 w-10 items-center justify-center transition-colors hover:text-brand"
+  >
+    <UserRound size={19} strokeWidth={1.7} />
+  </button>
+)}
 
             <button
               type="button"
@@ -1258,10 +1338,10 @@ onClick={(event) => {
               <a className="hover:text-brand" href="#women">
                 Women
               </a>
-              <a className="hover:text-brand" href="#kids">
+              <a className="hover:text-brand" href="#boys">
                Boys 
               </a>
-              <a className="hover:text-brand" href="#kids">
+              <a className="hover:text-brand" href="#girls">
                Girls
               </a>
             </div>

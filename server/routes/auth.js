@@ -48,6 +48,38 @@ function publicUser(user) {
   }
 }
 
+async function sendVerificationEmail(user) {
+  if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
+    throw new Error('Email service is not configured.')
+  }
+
+  const token = crypto.randomBytes(32).toString('hex')
+
+  user.verifyTokenHash = hashToken(token)
+  user.verifyTokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000)
+  await user.save()
+
+  const frontendUrl = process.env.CLIENT_ORIGIN || 'http://localhost:5173'
+  const verifyUrl = `${frontendUrl}/?verifyToken=${token}`
+
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.GMAIL_USER,
+      pass: process.env.GMAIL_APP_PASSWORD,
+    },
+  })
+
+  await transporter.sendMail({
+    from: process.env.GMAIL_USER,
+    to: user.email,
+    subject: 'Verify your Urban Outline email',
+    text:
+      `Welcome to Urban Outline! Use this link to verify your email:\n\n${verifyUrl}\n\n` +
+      'This link expires in 24 hours. If you did not sign up, ignore this email.',
+  })
+}
+
 function validOrigin(req, res, next) {
   const allowedOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173'
   const origin = req.get('Origin')
@@ -94,6 +126,16 @@ async function findSession(req) {
 router.post('/signup', validOrigin, authLimiter, async (req, res) => {
   try {
     const { fullName, phone = '', email, password } = req.body || {}
+    if (
+  typeof email !== 'string' ||
+  email.length > 254 ||
+  !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())
+) {
+  return res.status(400).json({
+    success: false,
+    message: 'Please enter a valid email address.',
+  })
+}
 
     if (
       typeof fullName !== 'string' ||
@@ -117,7 +159,8 @@ router.post('/signup', validOrigin, authLimiter, async (req, res) => {
     const normalizedEmail = email.trim().toLowerCase()
     const existing = await User.findOne({ email: normalizedEmail })
 
-    if (existing) {
+    // Verified ya Google wale account par dobara signup nahi ho sakta.
+    if (existing && existing.emailVerified !== false) {
       return res.status(409).json({
         success: false,
         message: 'This email is already registered. Please sign in.',
@@ -125,19 +168,41 @@ router.post('/signup', validOrigin, authLimiter, async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 12)
+    let user
 
-    const user = await User.create({
-      fullName: fullName.trim(),
-      phone: phone.trim(),
-      email: normalizedEmail,
-      passwordHash,
-    })
+    if (existing) {
+      // Pehle signup hua tha magar email verify nahi hui: details update karke link dobara bhejo.
+      existing.fullName = fullName.trim()
+      existing.phone = phone.trim()
+      existing.passwordHash = passwordHash
+      await existing.save()
+      user = existing
+    } else {
+      user = await User.create({
+        fullName: fullName.trim(),
+        phone: phone.trim(),
+        email: normalizedEmail,
+        passwordHash,
+        emailVerified: false,
+      })
+    }
 
-    await createSession(user, res)
+    let emailSent = true
+
+    try {
+      await sendVerificationEmail(user)
+    } catch (mailError) {
+      emailSent = false
+      console.error('Verification email failed:', mailError.message)
+    }
 
     return res.status(201).json({
       success: true,
-      user: publicUser(user),
+      verificationRequired: true,
+      emailSent,
+      message: emailSent
+        ? 'Account created. Please check your email and verify it before signing in.'
+        : 'Account created, but the verification email could not be sent. Please use resend.',
     })
   } catch (error) {
     if (error.code === 11000) {
@@ -185,6 +250,14 @@ router.post('/login', validOrigin, authLimiter, async (req, res) => {
       })
     }
 
+    if (user.emailVerified === false) {
+      return res.status(403).json({
+        success: false,
+        code: 'EMAIL_NOT_VERIFIED',
+        message: 'Please verify your email first. Check your inbox.',
+      })
+    }
+
     await createSession(user, res)
 
     return res.json({
@@ -199,7 +272,6 @@ router.post('/login', validOrigin, authLimiter, async (req, res) => {
     })
   }
 })
-
 
 router.post('/google', validOrigin, authLimiter, async (req, res) => {
   const { credential } = req.body || {}
@@ -266,9 +338,11 @@ router.post('/google', validOrigin, authLimiter, async (req, res) => {
         email,
         googleId: payload.sub,
         profilePicture: payload.picture || '',
+        emailVerified: true,
       })
     }
-        if (typeof payload.picture === 'string' && payload.picture !== user.profilePicture) {
+
+    if (typeof payload.picture === 'string' && payload.picture !== user.profilePicture) {
       user.profilePicture = payload.picture
       await user.save()
     }
@@ -294,6 +368,7 @@ router.post('/google', validOrigin, authLimiter, async (req, res) => {
     })
   }
 })
+
 const photoUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024, files: 1, fields: 0 },
@@ -381,76 +456,6 @@ router.post('/photo', validOrigin, authLimiter, async (req, res) => {
   }
 })
 
-router.post('/photo', validOrigin, authLimiter, (req, res) => {
-  photoUpload.single('photo')(req, res, async (uploadError) => {
-    if (uploadError) {
-      return res.status(400).json({
-        success: false,
-        message: 'Photo 5 MB se chhoti honi chahiye.',
-      })
-    }
-
-    try {
-      const session = await findSession(req)
-
-      if (!session) {
-        return res.status(401).json({
-          success: false,
-          message: 'Please sign in first.',
-        })
-      }
-
-      if (!req.file) {
-        return res.status(400).json({
-          success: false,
-          message: 'Please select a photo.',
-        })
-      }
-
-      const image = sharp(req.file.buffer, {
-        limitInputPixels: 20000000,
-        failOn: 'error',
-      })
-
-      const metadata = await image.metadata()
-
-      if (!['jpeg', 'png', 'webp'].includes(metadata.format)) {
-        return res.status(400).json({
-          success: false,
-          message: 'Please select a JPG, PNG or WebP image.',
-        })
-      }
-
-      const photo = await image
-        .rotate()
-        .resize(400, 400, { fit: 'cover' })
-        .webp({ quality: 80 })
-        .toBuffer()
-
-      const user = await User.findByIdAndUpdate(
-        session.userId,
-        { customPhoto: photo, hasCustomPhoto: true },
-        { new: true },
-      )
-
-      if (!user) {
-        return res.status(401).json({
-          success: false,
-          message: 'Please sign in again.',
-        })
-      }
-
-      return res.json({ success: true, user: publicUser(user) })
-    } catch (error) {
-      console.error('Photo upload failed:', error.message)
-      return res.status(400).json({
-        success: false,
-        message: 'Photo upload nahi hui. Valid image try karein.',
-      })
-    }
-  })
-})
-
 router.get('/photo', async (req, res) => {
   try {
     const session = await findSession(req)
@@ -467,6 +472,7 @@ router.get('/photo', async (req, res) => {
     return res.sendStatus(500)
   }
 })
+
 router.patch('/profile', validOrigin, authLimiter, async (req, res) => {
   try {
     const session = await findSession(req)
@@ -520,6 +526,7 @@ router.patch('/profile', validOrigin, authLimiter, async (req, res) => {
     })
   }
 })
+
 router.get('/me', async (req, res) => {
   try {
     const session = await findSession(req)
@@ -621,7 +628,7 @@ router.post('/forgot-password', validOrigin, resetRequestLimiter, async (req, re
     const user = await User.findOne({
       email: email.trim().toLowerCase(),
     }).select('+passwordHash')
-   
+
     // Google-only accounts do not have a local password to reset.
     if (user?.passwordHash) {
       if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
@@ -722,7 +729,6 @@ router.post('/reset-password', validOrigin, resetSubmitLimiter, async (req, res)
   }
 })
 
-
 router.post('/check-reset-link', validOrigin, resetCheckLimiter, async (req, res) => {
   const { token } = req.body || {}
 
@@ -747,6 +753,82 @@ router.post('/check-reset-link', validOrigin, resetCheckLimiter, async (req, res
     console.error('Reset link check failed:', error.message)
     return res.status(500).json({ message: 'Link check nahi ho saka. Dobara try karein.' })
   }
+})
+
+router.post('/verify-email', validOrigin, resetCheckLimiter, async (req, res) => {
+  const { token } = req.body || {}
+
+  res.set('Cache-Control', 'no-store')
+
+  if (typeof token !== 'string' || !/^[a-f0-9]{64}$/.test(token)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Verification link invalid or expired.',
+    })
+  }
+
+  try {
+    const user = await User.findOneAndUpdate(
+      {
+        verifyTokenHash: hashToken(token),
+        verifyTokenExpiresAt: { $gt: new Date() },
+      },
+      {
+        $set: { emailVerified: true },
+        $unset: { verifyTokenHash: 1, verifyTokenExpiresAt: 1 },
+      },
+      { returnDocument: 'after' },
+    )
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: 'Verification link invalid or expired. Please request a new one.',
+      })
+    }
+
+    return res.json({
+      success: true,
+      message: 'Email verified. Please sign in.',
+    })
+  } catch (error) {
+    console.error('Email verification failed:', error.message)
+    return res.status(500).json({
+      success: false,
+      message: 'Verification unavailable. Please try again.',
+    })
+  }
+})
+
+router.post('/resend-verification', validOrigin, resetRequestLimiter, async (req, res) => {
+  const { email } = req.body || {}
+
+  if (
+    typeof email !== 'string' ||
+    email.length > 254 ||
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: 'Please enter a valid email address.',
+    })
+  }
+
+  const genericMessage =
+    'If this account needs verification, a new link has been sent to your email.'
+
+  try {
+    const user = await User.findOne({ email: email.trim().toLowerCase() })
+
+    if (user && user.emailVerified === false) {
+      await sendVerificationEmail(user)
+    }
+  } catch (error) {
+    console.error('Resend verification failed:', error.message)
+  }
+
+  res.set('Cache-Control', 'no-store')
+  return res.json({ success: true, message: genericMessage })
 })
 
 module.exports = router

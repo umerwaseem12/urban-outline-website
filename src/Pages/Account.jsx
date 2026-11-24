@@ -6,6 +6,10 @@ import ProfileDashboard from './ProfileDashboard.jsx'
 import { API_BASE } from '../config'
 
 import { GoogleLogin, GoogleOAuthProvider } from '@react-oauth/google'
+const isValidEmail = (value) =>
+  typeof value === 'string' &&
+  value.trim().length <= 254 &&
+  /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value.trim())
 const inputClass =
   'w-full rounded-xl border border-[#e5e2de] bg-white px-4 py-2.5 text-sm text-[#24211f] outline-none transition-all duration-200 placeholder:text-[#aaa49e] focus:border-[#db7657] focus:ring-4 focus:ring-[#db7657]/10'
 
@@ -34,7 +38,7 @@ function GoogleIcon() {
 
 export default function Account({ onBack, isDark, onToggleTheme, onHelp }) {
   const reduceMotion = useReducedMotion()
-   const [resetOpen, setResetOpen] = useState(false)
+  const [resetOpen, setResetOpen] = useState(false)
 
   const [mode, setMode] = useState('login')
   const [fullName, setFullName] = useState('')
@@ -49,70 +53,72 @@ export default function Account({ onBack, isDark, onToggleTheme, onHelp }) {
   const [photoFailed, setPhotoFailed] = useState(false)
   const [profileView, setProfileView] = useState('profile')
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
-const [photoVersion, setPhotoVersion] = useState(0)
+  const [photoVersion, setPhotoVersion] = useState(0)
+  const [unverifiedEmail, setUnverifiedEmail] = useState('')
+  const [resending, setResending] = useState(false)
 
-async function handlePhotoUpload(event) {
-  const file = event.target.files?.[0]
-  event.target.value = ''
+  async function handlePhotoUpload(event) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
 
-  if (!file) return
+    if (!file) return
 
-  setFeedback(null)
-  setUploadingPhoto(true)
+    setFeedback(null)
+    setUploadingPhoto(true)
 
-  try {
-    const formData = new FormData()
-    formData.append('photo', file)
+    try {
+      const formData = new FormData()
+      formData.append('photo', file)
 
-    const response = await fetch(API_BASE + '/api/auth/photo', {
-      method: 'POST',
-      credentials: 'include',
-      body: formData,
-    })
+      const response = await fetch(API_BASE + '/api/auth/photo', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      })
 
-    const result = await response.json()
+      const result = await response.json()
 
-    if (!response.ok) {
-      throw new Error(result.message || 'Photo upload failed.')
+      if (!response.ok) {
+        throw new Error(result.message || 'Photo upload failed.')
+      }
+
+      setUser(result.user)
+      setPhotoFailed(false)
+      setPhotoVersion((version) => version + 1)
+      setFeedback({ type: 'info', text: 'Profile photo updated.' })
+    } catch (error) {
+      setFeedback({
+        type: 'error',
+        text: error.message || 'Photo upload failed.',
+      })
+    } finally {
+      setUploadingPhoto(false)
     }
-
-    setUser(result.user)
-    setPhotoFailed(false)
-    setPhotoVersion((version) => version + 1)
-    setFeedback({ type: 'info', text: 'Profile photo updated.' })
-  } catch (error) {
-    setFeedback({
-      type: 'error',
-      text: error.message || 'Photo upload failed.',
-    })
-  } finally {
-    setUploadingPhoto(false)
   }
-}
-const [checkingSession, setCheckingSession] = useState(true)
+  const [checkingSession, setCheckingSession] = useState(true)
 
-useEffect(() => {
-  let active = true
+  useEffect(() => {
+    let active = true
 
-  fetch(API_BASE + '/api/auth/me', {
-    credentials: 'include',
-  })
-    .then(async (response) => {
-      if (!response.ok) return null
-      return response.json()
+    fetch(API_BASE + '/api/auth/me', {
+      credentials: 'include',
     })
-    .then((result) => {
-      if (active && result?.user) setUser(result.user)
-    })
-    .catch((error) => console.error('Session check failed:', error))
-    .finally(() => {
-      if (active) setCheckingSession(false)
-    })
+      .then(async (response) => {
+        if (!response.ok) return null
+        return response.json()
+      })
+      .then((result) => {
+        if (active && result?.user) setUser(result.user)
+      })
+      .catch((error) => console.error('Session check failed:', error))
+      .finally(() => {
+        if (active) setCheckingSession(false)
+      })
 
-  return () => {
-    active = false
-  }
-}, [])
+    return () => {
+      active = false
+    }
+  }, [])
 
   function switchMode(nextMode) {
     setMode(nextMode)
@@ -121,24 +127,31 @@ useEffect(() => {
     setShowPassword(false)
     setShowConfirmPassword(false)
     setFeedback(null)
+    setUnverifiedEmail('')
   }
 
   async function handleSubmit(event) {
-  event.preventDefault()
-  setFeedback(null)
+    event.preventDefault()
+    setFeedback(null)
+    
+    if (!isValidEmail(email)) {
+  setFeedback({
+    type: 'error',
+    text: 'Please enter a valid email address.',
+  })
+  return
+}
 
-  if (mode === 'signup' && password !== confirmPassword) {
-    setFeedback({
-      type: 'error',
-      text: 'Passwords match nahi karte. Dobara check karein.',
-    })
-    return
-  }
+    if (mode === 'signup' && password !== confirmPassword) {
+      setFeedback({
+        type: 'error',
+        text: 'Passwords match nahi karte. Dobara check karein.',
+      })
+      return
+    }
 
-  try {
-    const response = await fetch(
-      API_BASE + `/api/auth/${mode}`,
-      {
+    try {
+      const response = await fetch(API_BASE + `/api/auth/${mode}`, {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -147,72 +160,129 @@ useEffect(() => {
         body: JSON.stringify(
           mode === 'signup'
             ? { fullName, phone, email, password }
-            : { email, password }
+            : { email, password },
         ),
+      })
+
+      const result = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        if (result.code === 'EMAIL_NOT_VERIFIED') {
+          setUnverifiedEmail(email)
+        }
+
+        setFeedback({
+          type: 'error',
+          text: result.message || 'Please try again.',
+        })
+        return
       }
-    )
 
-    const result = await response.json()
+      // Signup ke baad login nahi hota: pehle email verify karni hoti hai.
+      if (result.verificationRequired) {
+        setUnverifiedEmail(email)
+        setMode('login')
+        setPassword('')
+        setConfirmPassword('')
+        setShowPassword(false)
+        setShowConfirmPassword(false)
+        setFeedback({
+          type: 'info',
+          text:
+            result.message ||
+            'Account created. Please check your email and verify it before signing in.',
+        })
+        return
+      }
 
-    if (!response.ok) {
+      setPassword('')
+      setConfirmPassword('')
+      setUnverifiedEmail('')
+      setUser(result.user)
+      setFeedback({
+        type: 'info',
+        text: `Welcome, ${result.user.fullName}! You are signed in.`,
+      })
+    } catch (error) {
+      console.error('Authentication failed:', error)
       setFeedback({
         type: 'error',
-        text: result.message || 'Please try again.',
+        text: 'Server se connection nahi ho raha. Backend check karein.',
       })
-      return
     }
-
-    setPassword('')
-    setConfirmPassword('')
-    setUser(result.user)
-    setFeedback({
-      type: 'info',
-      text: `Welcome, ${result.user.fullName}! You are signed in.`,
-    })
-  } catch (error) {
-    console.error('Authentication failed:', error)
-    setFeedback({
-      type: 'error',
-      text: 'Server se connection nahi ho raha. Backend check karein.',
-    })
   }
-}
-  
-if (checkingSession) {
-  return <p className="p-8 text-center">Checking your account...</p>
-}
-async function handleGoogle(response) {
-  setFeedback(null)
 
-  try {
-    const result = await fetch(API_BASE + '/api/auth/google', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ credential: response.credential }),
-    })
+  async function handleResend() {
+    if (!unverifiedEmail || resending) return
 
-    const data = await result.json()
+    setResending(true)
 
-    if (!result.ok) {
+    try {
+      const response = await fetch(
+        API_BASE + '/api/auth/resend-verification',
+        {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: unverifiedEmail }),
+        },
+      )
+
+      const result = await response.json().catch(() => ({}))
+
+      setFeedback({
+        type: response.ok ? 'info' : 'error',
+        text:
+          result.message ||
+          (response.ok
+            ? 'A new verification link has been sent to your email.'
+            : 'Link bhejna nahi ho saka. Dobara try karein.'),
+      })
+    } catch {
       setFeedback({
         type: 'error',
-        text: data.message || 'Google sign-in failed.',
+        text: 'Server se connection nahi ho raha. Backend check karein.',
       })
-      return
+    } finally {
+      setResending(false)
     }
+  }
 
-    setUser(data.user)
+  if (checkingSession) {
+    return <p className="p-8 text-center">Checking your account...</p>
+  }
+  async function handleGoogle(response) {
     setFeedback(null)
-  } catch {
-    setFeedback({
-      type: 'error',
-      text: 'Server se connection nahi ho raha. Backend check karein.',
-    })
-  }
-}
 
- if (resetOpen) {
+    try {
+      const result = await fetch(API_BASE + '/api/auth/google', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential: response.credential }),
+      })
+
+      const data = await result.json()
+
+      if (!result.ok) {
+        setFeedback({
+          type: 'error',
+          text: data.message || 'Google sign-in failed.',
+        })
+        return
+      }
+
+      setUser(data.user)
+      setFeedback(null)
+    } catch {
+      setFeedback({
+        type: 'error',
+        text: 'Server se connection nahi ho raha. Backend check karein.',
+      })
+    }
+  }
+
+  if (resetOpen) {
     return (
       <PasswordReset
         initialEmail={email}
@@ -221,54 +291,45 @@ async function handleGoogle(response) {
     )
   }
   if (user) {
-  return (
-    <ProfileDashboard
-     user={user}
-      setUser={setUser}
-      photoFailed={photoFailed}
-      setPhotoFailed={setPhotoFailed}
-      photoVersion={photoVersion}
-      uploadingPhoto={uploadingPhoto}
-      handlePhotoUpload={handlePhotoUpload}
-      feedback={feedback}
-      onBack={onBack}
-      isDark={isDark}
-      onToggleTheme={onToggleTheme}
-      onHelp={onHelp}
-      onLogout={async () => {
-        try {
-          const response = await fetch(
-            API_BASE + '/api/auth/logout',
-            { method: 'POST', credentials: 'include' },
-          )
-
-          if (!response.ok) throw new Error('Logout failed')
-          setUser(null)
-          setPhotoFailed(false)
-          setFeedback(null)
-        } catch {
-          setFeedback({
-            type: 'error',
-            text: 'Logout nahi hua. Backend check karke dobara try karein.',
-          })
-        }
-      }}
-    />
-  )
-}
-
-if (resetOpen) {
     return (
-      <PasswordReset
-        initialEmail={user.email}
-        onBack={() => setResetOpen(false)}
+      <ProfileDashboard
+        user={user}
+        setUser={setUser}
+        photoFailed={photoFailed}
+        setPhotoFailed={setPhotoFailed}
+        photoVersion={photoVersion}
+        uploadingPhoto={uploadingPhoto}
+        handlePhotoUpload={handlePhotoUpload}
+        feedback={feedback}
+        onBack={onBack}
+        isDark={isDark}
+        onToggleTheme={onToggleTheme}
+        onHelp={onHelp}
+        onLogout={async () => {
+          try {
+            const response = await fetch(API_BASE + '/api/auth/logout', {
+              method: 'POST',
+              credentials: 'include',
+            })
+
+            if (!response.ok) throw new Error('Logout failed')
+            setUser(null)
+            setPhotoFailed(false)
+            setFeedback(null)
+          } catch {
+            setFeedback({
+              type: 'error',
+              text: 'Logout nahi hua. Backend check karke dobara try karein.',
+            })
+          }
+        }}
       />
     )
   }
 
   return (
     <main className="min-h-screen bg-[#f3f1ee] px-4 py-5 text-[#24211f] sm:px-6 sm:py-8">
-     <div className="mx-auto max-w-4xl">
+      <div className="mx-auto max-w-4xl">
         <header className="mb-6 flex items-center justify-between">
           <button
             type="button"
@@ -391,7 +452,7 @@ if (resetOpen) {
                       : 'Join Urban Outline for a more personal shopping experience.'}
                   </p>
 
-                  <div className="my-3 h-px bg-[#f0eeeb]"/>
+                  <div className="my-3 h-px bg-[#f0eeeb]" />
 
                   <form onSubmit={handleSubmit} className="space-y-2.5">
                     {mode === 'signup' && (
@@ -525,13 +586,13 @@ if (resetOpen) {
 
                     {mode === 'login' && (
                       <div className="flex justify-end">
-                      <button
-  type="button"
-  onClick={() => setResetOpen(true)}
-  className="text-xs font-medium text-[#db7657] hover:underline"
->
-  Forgot password?
-</button>
+                        <button
+                          type="button"
+                          onClick={() => setResetOpen(true)}
+                          className="text-xs font-medium text-[#db7657] hover:underline"
+                        >
+                          Forgot password?
+                        </button>
                       </div>
                     )}
 
@@ -546,6 +607,19 @@ if (resetOpen) {
                       >
                         {feedback.text}
                       </p>
+                    )}
+
+                    {unverifiedEmail && (
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={handleResend}
+                          disabled={resending}
+                          className="text-xs font-medium text-[#db7657] hover:underline disabled:opacity-60"
+                        >
+                          {resending ? 'Sending...' : 'Resend verification link'}
+                        </button>
+                      </div>
                     )}
 
                     <motion.button
@@ -585,30 +659,29 @@ if (resetOpen) {
                   </div>
 
                   {import.meta.env.VITE_GOOGLE_CLIENT_ID ? (
-  <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
-    <div className="flex justify-center">
-      <GoogleLogin
-        onSuccess={handleGoogle}
-        onError={() =>
-          setFeedback({
-            type: 'error',
-            text: 'Google sign-in failed. Please try again.',
-          })
-        }
-        text="continue_with"
-        shape="pill"
-      />
-    </div>
-  </GoogleOAuthProvider>
-) : (
-  <p className="text-center text-sm text-red-700">
-    Google sign-in is not configured.
-  </p>
-)}
+                    <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
+                      <div className="flex justify-center">
+                        <GoogleLogin
+                          onSuccess={handleGoogle}
+                          onError={() =>
+                            setFeedback({
+                              type: 'error',
+                              text: 'Google sign-in failed. Please try again.',
+                            })
+                          }
+                          text="continue_with"
+                          shape="pill"
+                        />
+                      </div>
+                    </GoogleOAuthProvider>
+                  ) : (
+                    <p className="text-center text-sm text-red-700">
+                      Google sign-in is not configured.
+                    </p>
+                  )}
 
                   <p className="mt-5 text-center text-[11px] leading-5 text-[#aaa49e]">
                     You can also shop as a guest.
-
                   </p>
                 </motion.div>
               </AnimatePresence>
