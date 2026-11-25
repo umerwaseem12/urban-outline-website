@@ -30,7 +30,7 @@ import {
 import { FaFacebookF, FaInstagram } from 'react-icons/fa'
 
 
-import { catalogGroups, products } from '../shared/catalog.mjs'
+import { catalogGroups, products as catalogProducts } from '../shared/catalog.mjs'
 
 const navItems = [
   { label: 'Men', href: '#men' },
@@ -289,6 +289,32 @@ function ProductCard({
         setVerifyMessage('Server se connection nahi ho raha. Dobara try karein.')
       })
   }, [verifyToken])
+  const [products, setProducts] = useState(catalogProducts)
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    async function loadProducts() {
+      try {
+        const response = await fetch(API_BASE + '/api/products', {
+          signal: controller.signal,
+        })
+
+        if (!response.ok) return
+
+        const data = await response.json()
+
+        if (Array.isArray(data.products) && data.products.length > 0) {
+          setProducts(data.products)
+        }
+      } catch {
+        // Backend na mile to purani catalog wali list hi chalti rahe.
+      }
+    }
+
+    loadProducts()
+    return () => controller.abort()
+  }, [])
   const [isDark, setIsDark] = useState(
     () =>
       typeof window !== 'undefined' &&
@@ -384,7 +410,7 @@ const [searchFocused, setSearchFocused] = useState(false)
 
     return matchesGroup && matchesQuery
   })
-}, [searchQuery, selectedGroup])
+}, [searchQuery, selectedGroup, products])
 
   const cartCount = cartItems.reduce(
     (total, item) => total + item.quantity,
@@ -417,7 +443,7 @@ const [searchFocused, setSearchFocused] = useState(false)
     .sort((a, b) => b.score - a.score)
     .slice(0, 7)
     .map((result) => result.product)
-}, [searchQuery])
+}, [searchQuery, products])
 
   const cartTotal = cartItems.reduce(
     (total, item) => total + item.price * item.quantity,
