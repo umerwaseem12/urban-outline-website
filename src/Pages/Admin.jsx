@@ -426,11 +426,774 @@ function MessagesSection() {
     </section>
   )
 }
+const CATEGORY_SEPARATOR = ' \u00B7 '
+
+const fieldClass =
+  'w-full rounded-lg border border-[#ded8d2] bg-white px-3 py-2 text-sm outline-none focus:border-[#db7657]'
+const labelClass = 'mb-1 block text-xs font-bold text-[#827b75]'
+
+function toDraft(product) {
+  return {
+    name: product.name || '',
+    category: product.category || '',
+    price: String(product.price ?? ''),
+    oldPrice: product.oldPrice == null ? '' : String(product.oldPrice),
+    stock: String(product.stock ?? ''),
+    lowStockAt: String(product.lowStockAt ?? ''),
+    image: product.image || '',
+    description: product.description || '',
+  }
+}
+
+function groupLabelFor(products, groupId) {
+  const sample = products.find((item) => item.group === groupId)
+  return sample ? sample.category.split(CATEGORY_SEPARATOR)[0] : groupId
+}
+
+function AddProductForm({ groups, labelFor, onCreated, onClose }) {
+  const [form, setForm] = useState(() => ({
+    group: groups[0] || '',
+    category: groups[0] ? labelFor(groups[0]) + CATEGORY_SEPARATOR : '',
+    name: '',
+    price: '',
+    oldPrice: '',
+    stock: '0',
+    image: '',
+    description: '',
+  }))
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  function handleChange(event) {
+    const { name, value } = event.target
+    setForm((current) => ({ ...current, [name]: value }))
+  }
+
+  function handleGroupChange(event) {
+    const group = event.target.value
+    setForm((current) => ({
+      ...current,
+      group,
+      category: labelFor(group) + CATEGORY_SEPARATOR,
+    }))
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault()
+    setError('')
+
+    if (form.category.trim().endsWith('\u00B7')) {
+      setError('Category poori likhein, jaise: Men \u00B7 Shirts')
+      return
+    }
+
+    setSaving(true)
+
+    try {
+      const response = await fetch(API_BASE + '/api/admin/products', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      })
+
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Product nahi bana.')
+      }
+
+      onCreated(data.product)
+      onClose()
+    } catch (err) {
+      setError(err.message || 'Product nahi bana.')
+      setSaving(false)
+    }
+  }
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="mt-5 rounded-2xl border border-[#db7657] bg-white p-4 shadow-sm sm:p-5"
+    >
+      <p className="text-sm font-bold">Add new product</p>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div>
+          <label htmlFor="new-group" className={labelClass}>
+            Group
+          </label>
+          <select
+            id="new-group"
+            name="group"
+            value={form.group}
+            onChange={handleGroupChange}
+            className={fieldClass}
+          >
+            {groups.map((groupId) => (
+              <option key={groupId} value={groupId}>
+                {labelFor(groupId)}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label htmlFor="new-category" className={labelClass}>
+            Category (jaise Men &middot; Shirts)
+          </label>
+          <input
+            id="new-category"
+            name="category"
+            value={form.category}
+            onChange={handleChange}
+            className={fieldClass}
+          />
+        </div>
+
+        <div className="sm:col-span-2">
+          <label htmlFor="new-name" className={labelClass}>
+            Product name
+          </label>
+          <input
+            id="new-name"
+            name="name"
+            value={form.name}
+            onChange={handleChange}
+            className={fieldClass}
+          />
+        </div>
+
+        <div>
+          <label htmlFor="new-price" className={labelClass}>
+            Price (Rs.)
+          </label>
+          <input
+            id="new-price"
+            name="price"
+            type="number"
+            min="0"
+            step="1"
+            value={form.price}
+            onChange={handleChange}
+            className={fieldClass}
+          />
+        </div>
+
+        <div>
+          <label htmlFor="new-old-price" className={labelClass}>
+            Old price (optional)
+          </label>
+          <input
+            id="new-old-price"
+            name="oldPrice"
+            type="number"
+            min="0"
+            step="1"
+            value={form.oldPrice}
+            onChange={handleChange}
+            className={fieldClass}
+          />
+        </div>
+
+        <div>
+          <label htmlFor="new-stock" className={labelClass}>
+            Starting stock
+          </label>
+          <input
+            id="new-stock"
+            name="stock"
+            type="number"
+            min="0"
+            step="1"
+            value={form.stock}
+            onChange={handleChange}
+            className={fieldClass}
+          />
+        </div>
+
+        <div>
+          <label htmlFor="new-image" className={labelClass}>
+            Image link (https://...)
+          </label>
+          <input
+            id="new-image"
+            name="image"
+            value={form.image}
+            onChange={handleChange}
+            className={fieldClass}
+          />
+        </div>
+
+        <div className="sm:col-span-2">
+          <label htmlFor="new-description" className={labelClass}>
+            Description (optional)
+          </label>
+          <textarea
+            id="new-description"
+            name="description"
+            rows={3}
+            value={form.description}
+            onChange={handleChange}
+            className={fieldClass}
+          />
+        </div>
+      </div>
+
+      {error && (
+        <p role="alert" className="mt-3 text-xs text-red-700">
+          {error}
+        </p>
+      )}
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button
+          type="submit"
+          disabled={saving}
+          className="rounded-lg bg-[#24211f] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#db7657] disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {saving ? 'Saving...' : 'Create product'}
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={saving}
+          className="rounded-lg border border-[#ded8d2] px-4 py-2 text-sm font-bold transition hover:border-[#db7657]"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
+  )
+}
+
+function ProductRow({ product, onUpdated }) {
+  const [draft, setDraft] = useState(() => toDraft(product))
+  const [open, setOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState('')
+  const [failed, setFailed] = useState(false)
+
+  const dirty = JSON.stringify(draft) !== JSON.stringify(toDraft(product))
+  const outOfStock = product.stock === 0
+  const lowStock = product.stock > 0 && product.stock <= product.lowStockAt
+
+  function handleChange(event) {
+    const { name, value } = event.target
+    setDraft((current) => ({ ...current, [name]: value }))
+    setMessage('')
+  }
+
+  async function patch(body) {
+    setSaving(true)
+    setMessage('')
+    setFailed(false)
+
+    try {
+      const response = await fetch(
+        API_BASE + `/api/admin/products/${product._id}`,
+        {
+          method: 'PATCH',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        },
+      )
+
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Product update nahi hua.')
+      }
+
+      onUpdated(data.product)
+      setDraft(toDraft(data.product))
+      setMessage('Saved.')
+    } catch (error) {
+      setFailed(true)
+      setMessage(error.message || 'Product update nahi hua.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function saveDraft() {
+    patch({
+      name: draft.name,
+      category: draft.category,
+      price: draft.price,
+      oldPrice: draft.oldPrice,
+      stock: draft.stock,
+      lowStockAt: draft.lowStockAt,
+      image: draft.image,
+      description: draft.description,
+    })
+  }
+
+  return (
+    <article
+      className={`rounded-2xl border border-[#e8e3de] bg-white p-4 shadow-sm sm:p-5 ${
+        product.active ? '' : 'opacity-70'
+      }`}
+    >
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-[#f5f3f1]">
+          {product.image && (
+            <img
+              src={product.image}
+              alt=""
+              loading="lazy"
+              referrerPolicy="no-referrer"
+              className="h-full w-full object-cover"
+            />
+          )}
+        </div>
+
+        <div className="min-w-0 flex-1 basis-48">
+          <p className="break-words text-sm font-bold">{product.name}</p>
+          <p className="mt-0.5 break-words text-xs text-[#8b837c]">
+            {product.productId} | {product.category}
+          </p>
+
+          <div className="mt-2 flex flex-wrap gap-2">
+            {!product.active && (
+              <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-bold text-gray-700 ring-1 ring-inset ring-gray-200">
+                Hidden
+              </span>
+            )}
+            {outOfStock && (
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-bold ring-1 ring-inset ${statusColors.cancelled}`}
+              >
+                Out of stock
+              </span>
+            )}
+            {lowStock && (
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-bold ring-1 ring-inset ${statusColors.processing}`}
+              >
+                Low stock
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="w-28">
+            <label htmlFor={`price-${product._id}`} className={labelClass}>
+              Price (Rs.)
+            </label>
+            <input
+              id={`price-${product._id}`}
+              name="price"
+              type="number"
+              min="0"
+              step="1"
+              inputMode="numeric"
+              value={draft.price}
+              onChange={handleChange}
+              disabled={saving}
+              className={fieldClass}
+            />
+          </div>
+
+          <div className="w-24">
+            <label htmlFor={`stock-${product._id}`} className={labelClass}>
+              Stock
+            </label>
+            <input
+              id={`stock-${product._id}`}
+              name="stock"
+              type="number"
+              min="0"
+              step="1"
+              inputMode="numeric"
+              value={draft.stock}
+              onChange={handleChange}
+              disabled={saving}
+              className={fieldClass}
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={saveDraft}
+            disabled={saving || !dirty}
+            className="rounded-lg bg-[#24211f] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#db7657] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {saving ? 'Saving...' : 'Save'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => patch({ active: !product.active })}
+            disabled={saving}
+            className="rounded-lg border border-[#ded8d2] px-4 py-2 text-sm font-bold transition hover:border-[#db7657] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {product.active ? 'Hide' : 'Show'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setOpen((value) => !value)}
+            className="rounded-lg border border-[#ded8d2] px-4 py-2 text-sm font-bold transition hover:border-[#db7657]"
+          >
+            {open ? 'Close' : 'Edit details'}
+          </button>
+        </div>
+      </div>
+
+      {open && (
+        <div className="mt-4 grid gap-3 border-t border-[#f0ece8] pt-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor={`name-${product._id}`} className={labelClass}>
+              Product name
+            </label>
+            <input
+              id={`name-${product._id}`}
+              name="name"
+              value={draft.name}
+              onChange={handleChange}
+              disabled={saving}
+              className={fieldClass}
+            />
+          </div>
+
+          <div>
+            <label htmlFor={`category-${product._id}`} className={labelClass}>
+              Category
+            </label>
+            <input
+              id={`category-${product._id}`}
+              name="category"
+              value={draft.category}
+              onChange={handleChange}
+              disabled={saving}
+              className={fieldClass}
+            />
+          </div>
+
+          <div>
+            <label htmlFor={`oldprice-${product._id}`} className={labelClass}>
+              Old price (khali = koi discount nahi)
+            </label>
+            <input
+              id={`oldprice-${product._id}`}
+              name="oldPrice"
+              type="number"
+              min="0"
+              step="1"
+              value={draft.oldPrice}
+              onChange={handleChange}
+              disabled={saving}
+              className={fieldClass}
+            />
+          </div>
+
+          <div>
+            <label htmlFor={`low-${product._id}`} className={labelClass}>
+              Low stock alert (is se kam ho to warning)
+            </label>
+            <input
+              id={`low-${product._id}`}
+              name="lowStockAt"
+              type="number"
+              min="0"
+              step="1"
+              value={draft.lowStockAt}
+              onChange={handleChange}
+              disabled={saving}
+              className={fieldClass}
+            />
+          </div>
+
+          <div className="sm:col-span-2">
+            <label htmlFor={`image-${product._id}`} className={labelClass}>
+              Image link (https://...)
+            </label>
+            <input
+              id={`image-${product._id}`}
+              name="image"
+              value={draft.image}
+              onChange={handleChange}
+              disabled={saving}
+              className={fieldClass}
+            />
+          </div>
+
+          <div className="sm:col-span-2">
+            <label
+              htmlFor={`description-${product._id}`}
+              className={labelClass}
+            >
+              Description
+            </label>
+            <textarea
+              id={`description-${product._id}`}
+              name="description"
+              rows={3}
+              value={draft.description}
+              onChange={handleChange}
+              disabled={saving}
+              className={fieldClass}
+            />
+          </div>
+        </div>
+      )}
+
+      {message && (
+        <p
+          role={failed ? 'alert' : 'status'}
+          className={`mt-3 text-xs ${
+            failed ? 'text-red-700' : 'text-emerald-700'
+          }`}
+        >
+          {message}
+        </p>
+      )}
+    </article>
+  )
+}
+
+function ProductsSection() {
+  const [products, setProducts] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [query, setQuery] = useState('')
+  const [group, setGroup] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [showAdd, setShowAdd] = useState(false)
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    async function loadProducts() {
+      try {
+        const response = await fetch(API_BASE + '/api/admin/products', {
+          credentials: 'include',
+          signal: controller.signal,
+        })
+
+        if (response.status === 401) {
+          throw new Error(
+            'Admin account se sign in karein, phir yahan wapas aayein.',
+          )
+        }
+
+        if (response.status === 403) {
+          throw new Error('Is account ko admin access nahi hai.')
+        }
+
+        if (!response.ok) {
+          throw new Error('Products load nahi hue. Dobara try karein.')
+        }
+
+        const data = await response.json()
+        setProducts(data.products || [])
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          setError(err.message || 'Backend se connection nahi ho raha.')
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoading(false)
+      }
+    }
+
+    loadProducts()
+    return () => controller.abort()
+  }, [])
+
+  function updateProduct(updated) {
+    setProducts((current) =>
+      current.map((item) => (item._id === updated._id ? updated : item)),
+    )
+  }
+
+  function addProduct(created) {
+    setProducts((current) => [created, ...current])
+  }
+
+  const groups = [...new Set(products.map((item) => item.group))]
+  const labelFor = (groupId) => groupLabelFor(products, groupId)
+  const isLow = (item) => item.stock > 0 && item.stock <= item.lowStockAt
+
+  const cards = [
+    { key: 'all', label: 'Total products', value: products.length },
+    {
+      key: 'active',
+      label: 'Visible',
+      value: products.filter((item) => item.active).length,
+    },
+    {
+      key: 'hidden',
+      label: 'Hidden',
+      value: products.filter((item) => !item.active).length,
+    },
+    { key: 'low', label: 'Low stock', value: products.filter(isLow).length },
+    {
+      key: 'out',
+      label: 'Out of stock',
+      value: products.filter((item) => item.stock === 0).length,
+    },
+  ]
+
+  const search = query.trim().toLowerCase()
+
+  const visible = products.filter((item) => {
+    if (
+      search &&
+      !item.name.toLowerCase().includes(search) &&
+      !item.productId.toLowerCase().includes(search)
+    ) {
+      return false
+    }
+    if (group !== 'all' && item.group !== group) return false
+    if (statusFilter === 'active' && !item.active) return false
+    if (statusFilter === 'hidden' && item.active) return false
+    if (statusFilter === 'out' && item.stock !== 0) return false
+    if (statusFilter === 'low' && !isLow(item)) return false
+    return true
+  })
+
+  return (
+    <section>
+      <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#d46d4f]">
+        Catalog and stock
+      </p>
+      <h2 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
+        Products
+      </h2>
+      <p className="mt-3 text-sm leading-6 text-[#827b75]">
+        Price, stock aur visibility yahan se badlein. Hide karne se product
+        delete nahi hota, sirf chhup jata hai.
+      </p>
+
+      {loading && (
+        <div className="mt-6 rounded-2xl border border-[#e8e3de] bg-white p-8 text-sm text-[#77706a]">
+          Products load ho rahe hain...
+        </div>
+      )}
+
+      {error && (
+        <div
+          role="alert"
+          className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700"
+        >
+          {error}
+        </div>
+      )}
+
+      {!loading && !error && (
+        <>
+          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+            {cards.map((card) => (
+              <button
+                type="button"
+                key={card.key}
+                onClick={() => setStatusFilter(card.key)}
+                aria-pressed={statusFilter === card.key}
+                className={`rounded-2xl border border-[#db7657] bg-white p-4 text-left shadow-sm transition hover:shadow-md ${
+                  statusFilter === card.key ? 'ring-2 ring-[#db7657]/30' : ''
+                }`}
+              >
+                <p className="text-3xl font-bold tracking-tight">
+                  {card.value}
+                </p>
+                <p className="mt-1 text-sm font-medium text-[#827b75]">
+                  {card.label}
+                </p>
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-6 flex flex-wrap items-end gap-3">
+            <div className="min-w-[220px] flex-1">
+              <label htmlFor="product-search" className={labelClass}>
+                Search (naam ya ID)
+              </label>
+              <input
+                id="product-search"
+                type="search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="jaise Oxford ya men-1"
+                className={fieldClass}
+              />
+            </div>
+
+            <div className="w-44">
+              <label htmlFor="product-group" className={labelClass}>
+                Group
+              </label>
+              <select
+                id="product-group"
+                value={group}
+                onChange={(event) => setGroup(event.target.value)}
+                className={fieldClass}
+              >
+                <option value="all">All groups</option>
+                {groups.map((groupId) => (
+                  <option key={groupId} value={groupId}>
+                    {labelFor(groupId)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowAdd((value) => !value)}
+              className="rounded-lg bg-[#24211f] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#db7657]"
+            >
+              {showAdd ? 'Close form' : 'Add product'}
+            </button>
+          </div>
+
+          {showAdd && (
+            <AddProductForm
+              groups={groups}
+              labelFor={labelFor}
+              onCreated={addProduct}
+              onClose={() => setShowAdd(false)}
+            />
+          )}
+
+          <p className="mt-4 text-xs text-[#928b85]">
+            {visible.length} products dikh rahe hain. Naya product list ke
+            shuru mein dikhta hai, page reload par aakhir mein chala jata hai.
+          </p>
+
+          {visible.length === 0 ? (
+            <div className="mt-4 rounded-[24px] border border-[#e9e5e0] bg-white px-6 py-14 text-center">
+              <Package size={32} className="mx-auto text-[#c7bdb5]" />
+              <p className="mt-4 font-semibold">No products found</p>
+              <p className="mt-1 text-sm text-[#928b85]">
+                Search ya filter badal kar dekhein.
+              </p>
+            </div>
+          ) : (
+            <div className="mt-4 space-y-4">
+              {visible.map((item) => (
+                <ProductRow
+                  key={item._id}
+                  product={item}
+                  onUpdated={updateProduct}
+                />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  )
+}
+
 export default function Admin() {
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [filter, setFilter] = useState('all')
+  const [tab, setTab] = useState('orders')
 
   useEffect(() => {
     const controller = new AbortController()
@@ -557,6 +1320,31 @@ export default function Admin() {
       </header>
 
       <div className="mx-auto max-w-[1500px] px-5 py-8 sm:px-8 lg:px-12 lg:py-12">
+        {/* Section tabs */}
+        <div className="mb-8 flex flex-wrap gap-2">
+          {[
+            { id: 'orders', label: 'Orders' },
+            { id: 'products', label: 'Products & stock' },
+            { id: 'messages', label: 'Messages' },
+          ].map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setTab(item.id)}
+              aria-pressed={tab === item.id}
+              className={
+                'rounded-full border px-5 py-2 text-sm font-bold transition ' +
+                (tab === item.id
+                  ? 'border-[#24211f] bg-[#24211f] text-white'
+                  : 'border-[#e8e3de] bg-white text-[#77706a] hover:border-[#db7657]')
+              }
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+
+        <div className={tab === 'orders' ? '' : 'hidden'}>
         {/* Page title */}
         <div className="mb-9 flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -673,7 +1461,13 @@ export default function Admin() {
           </>
         )}
 
-        {!loading && !error && <MessagesSection />}
+        </div>
+
+        <div className={tab === 'messages' ? '' : 'hidden'}>
+          {!loading && !error && <MessagesSection />}
+        </div>
+
+        {tab === 'products' && <ProductsSection />}
       </div>
     </main>
   )
