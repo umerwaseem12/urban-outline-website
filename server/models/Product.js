@@ -27,4 +27,7 @@ const productSchema = new mongoose.Schema(
   { timestamps: true },
 )
 
+// Matches the storefront query (active products in display order).
+productSchema.index({ active: 1, sortOrder: 1 })
+
 module.exports = mongoose.model('Product', productSchema)

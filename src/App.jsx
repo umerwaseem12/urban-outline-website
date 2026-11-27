@@ -43,6 +43,7 @@ const navItems = [
 const formatPrice = (amount) =>
   `Rs. ${new Intl.NumberFormat('en-PK').format(amount)}`
 const PRODUCTS_PER_PAGE = 12
+const PRODUCTS_STORAGE_KEY = 'urban-outline-products'
 const CART_STORAGE_KEY = 'urban-outline-cart'
 const FAVOURITES_STORAGE_KEY = 'urban-outline-favourites'
 const MAX_QUANTITY_PER_LINE = 20
@@ -54,6 +55,39 @@ const readStoredList = (key) => {
     return Array.isArray(parsed) ? parsed : []
   } catch {
     return []
+  }
+}
+
+// The catalog is cached in the browser so returning visitors see products
+// straight away while the fresh copy loads in the background.
+const readCachedProducts = () => {
+  try {
+    const cached = JSON.parse(
+      window.localStorage.getItem(PRODUCTS_STORAGE_KEY) || 'null',
+    )
+
+    if (!cached || !Array.isArray(cached.products)) return []
+
+    if (Date.now() - Number(cached.savedAt || 0) > 24 * 60 * 60 * 1000) {
+      return []
+    }
+
+    return cached.products.filter(
+      (product) => product && typeof product.id === 'string',
+    )
+  } catch {
+    return []
+  }
+}
+
+const saveCachedProducts = (products) => {
+  try {
+    window.localStorage.setItem(
+      PRODUCTS_STORAGE_KEY,
+      JSON.stringify({ savedAt: Date.now(), products }),
+    )
+  } catch {
+    // Storage full or unavailable: browsing still works without the cache.
   }
 }
 
@@ -418,8 +452,10 @@ function ProductCard({
         )
       })
   }, [verifyToken])
-  const [products, setProducts] = useState([])
-  const [productsLoading, setProductsLoading] = useState(true)
+  const [products, setProducts] = useState(readCachedProducts)
+  const [productsLoading, setProductsLoading] = useState(
+    () => products.length === 0,
+  )
 
   useEffect(() => {
     const controller = new AbortController()
@@ -435,6 +471,7 @@ function ProductCard({
 
           if (Array.isArray(data.products) && data.products.length > 0) {
             setProducts(data.products)
+            saveCachedProducts(data.products)
             setProductsLoading(false)
             return
           }
@@ -443,8 +480,9 @@ function ProductCard({
         if (controller.signal.aborted) return
       }
 
-      // Backend not reachable: keep the bundled catalog so browsing still works.
-      setProducts(catalogProducts)
+      // Backend not reachable: keep the cached or bundled catalog so browsing
+      // still works.
+      setProducts((current) => (current.length > 0 ? current : catalogProducts))
       setProductsLoading(false)
     }
 
