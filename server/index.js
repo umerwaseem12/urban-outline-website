@@ -13,9 +13,18 @@ console.log('Google Client ID loaded:', Boolean(process.env.GOOGLE_CLIENT_ID))
 
 const PORT = process.env.PORT || 5000
 
+const { allowedOrigins } = require('./lib/origins')
+
 app.use(
   cors({
-    origin: process.env.CLIENT_ORIGIN || 'http://localhost:5173',
+    origin(origin, callback) {
+      if (!origin || allowedOrigins().includes(origin)) {
+        callback(null, true)
+        return
+      }
+
+      callback(new Error('Origin not allowed by CORS'))
+    },
     credentials: true,
   }),
 )

@@ -4,10 +4,49 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>urban-outline</title>
+    <title>Urban Outline | Everyday Fashion in Pakistan</title>
+    <meta
+      name="description"
+      content="Urban Outline is a Pakistan-based clothing store for men, women, boys and girls. Easy everyday pieces, thoughtful details and cash on delivery nationwide."
+    />
+    <meta name="theme-color" content="#d97757" />
+    <link rel="canonical" href="https://urban-outline.vercel.app/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Urban Outline" />
+    <meta property="og:title" content="Urban Outline | Everyday Fashion in Pakistan" />
+    <meta
+      property="og:description"
+      content="Easy pieces, considered details and a little room to be yourself. Shop the Urban Outline edit."
+    />
+    <meta property="og:url" content="https://urban-outline.vercel.app/" />
+    <meta property="og:image" content="https://urban-outline.vercel.app/urban.jpg" />
+    <meta property="og:image:alt" content="Urban Outline logo" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Urban Outline | Everyday Fashion in Pakistan" />
+    <meta
+      name="twitter:description"
+      content="Easy pieces, considered details and a little room to be yourself. Shop the Urban Outline edit."
+    />
+    <meta name="twitter:image" content="https://urban-outline.vercel.app/urban.jpg" />
+
+    <script>
+      // Apply the saved theme before first paint so dark mode does not flash.
+      try {
+        if (localStorage.getItem('urban-outline-theme') === 'dark') {
+          document.documentElement.classList.add('dark')
+        }
+      } catch (error) {
+        console.warn('Theme preference unavailable.', error)
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      Urban Outline needs JavaScript enabled to show products and checkout.
+    </noscript>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

@@ -27,7 +27,7 @@ const chatLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: {
-    message: 'Bohot zyada messages bheje gaye hain. Thori der baad try karein.',
+    message: 'Too many messages. Please try again shortly.',
   },
 })
 
@@ -101,7 +101,7 @@ router.post('/', chatLimiter, async (req, res) => {
     if (!process.env.GEMINI_API_KEY) {
       console.error('GEMINI_API_KEY server environment mein nahi mili.')
       return res.status(503).json({
-        message: 'Assistant abhi available nahi hai.',
+        message: 'The assistant is not available right now.',
       })
     }
 
@@ -109,7 +109,7 @@ router.post('/', chatLimiter, async (req, res) => {
 
     if (!Array.isArray(messages) || messages.length === 0 || messages.length > 12) {
       return res.status(400).json({
-        message: 'Messages ka format sahi nahi hai.',
+        message: 'The messages format is invalid.',
       })
     }
 
@@ -124,7 +124,7 @@ router.post('/', chatLimiter, async (req, res) => {
 
     if (!validMessages || messages[messages.length - 1].role !== 'user') {
       return res.status(400).json({
-        message: 'Message ka format sahi nahi hai.',
+        message: 'The message format is invalid.',
       })
     }
 
@@ -218,7 +218,7 @@ ${JSON.stringify(catalog)}
           // 400/401/403 = key ya request ka masla, retry ka faida nahi.
           if (lastStatus && !RETRY_STATUSES.has(lastStatus)) {
             return res.status(502).json({
-              message: 'Assistant se jawab nahi mil saka. Thori der baad try karein.',
+              message: 'The assistant did not answer. Please try again shortly.',
             })
           }
         }
@@ -239,7 +239,7 @@ ${JSON.stringify(catalog)}
     console.error('Chat service failed:', error.name, error.message)
 
     return res.status(500).json({
-      message: 'Assistant mein problem aa gayi. Thori der baad try karein.',
+      message: 'Something went wrong with the assistant. Please try again shortly.',
     })
   }
 })

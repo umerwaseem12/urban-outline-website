@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import "./OrderConfirmation.css";
 
 const money = (amount) =>
@@ -303,6 +303,10 @@ export default function OrderConfirmation({
                 <div className="uo-confirm__summaryRow">
                   <span>Delivery</span>
                   <span>{shippingFee ? money(shippingFee) : "Free"}</span>
+                </div>
+                <div className="uo-confirm__summaryRow">
+                  <span>Estimated arrival</span>
+                  <span>{deliveryEstimate}</span>
                 </div>
                 <div className="uo-confirm__summaryTotal">
                   <span>Total</span>

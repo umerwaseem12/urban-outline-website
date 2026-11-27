@@ -8,6 +8,16 @@ const Product = require('../models/Product')
 
 const router = express.Router()
 
+const ORDER_STATUSES = [
+  'placed',
+  'processing',
+  'shipped',
+  'delivered',
+  'cancelled',
+]
+
+const { isAllowedOrigin } = require('../lib/origins')
+
 async function requireAdmin(req, res, next) {
   try {
     const token = req.cookies?.urban_session
@@ -45,37 +55,70 @@ async function requireAdmin(req, res, next) {
 
 router.get('/orders', requireAdmin, async (req, res) => {
   try {
-    const orders = await Order.find()
-      .sort({ createdAt: -1 })
-      .limit(50)
-      .lean()
+    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1)
+    const limit = Math.min(
+      100,
+      Math.max(1, Number.parseInt(req.query.limit, 10) || 20),
+    )
+    const status = typeof req.query.status === 'string' ? req.query.status : ''
+    const search = typeof req.query.q === 'string' ? req.query.q.trim() : ''
+
+    const filter = {}
+
+    if (ORDER_STATUSES.includes(status)) {
+      filter.orderStatus = status
+    }
+
+    if (search) {
+      // Escape regex characters so a stray "(" cannot break the query.
+      const safe = search.slice(0, 80).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const rx = new RegExp(safe, 'i')
+
+      filter.$or = [
+        { 'customer.fullName': rx },
+        { 'customer.phone': rx },
+        { 'customer.email': rx },
+        { 'customer.city': rx },
+        { 'items.name': rx },
+      ]
+
+      if (/^[a-f\d]{24}$/i.test(search)) {
+        filter.$or.push({ _id: search })
+      }
+    }
+
+    const [orders, total] = await Promise.all([
+      Order.find(filter)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      Order.countDocuments(filter),
+    ])
 
     res.set('Cache-Control', 'private, no-store')
-    return res.json({ success: true, orders })
+    return res.json({
+      success: true,
+      orders,
+      total,
+      page,
+      limit,
+      pageCount: Math.max(1, Math.ceil(total / limit)),
+    })
   } catch (error) {
     console.error('Admin orders failed:', error.message)
-    return res.status(500).json({ message: 'Orders load nahi hue.' })
+    return res.status(500).json({ message: 'Orders could not be loaded.' })
   }
 })
 
 router.patch('/orders/:id/status', requireAdmin, async (req, res) => {
-  const allowedOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173'
-
-  if (req.get('Origin') !== allowedOrigin) {
+  if (!isAllowedOrigin(req)) {
     return res.status(403).json({ message: 'Request origin is not allowed.' })
   }
 
-  const allowedStatuses = [
-    'placed',
-    'processing',
-    'shipped',
-    'delivered',
-    'cancelled',
-  ]
-
   const { status } = req.body || {}
 
-  if (!allowedStatuses.includes(status)) {
+  if (!ORDER_STATUSES.includes(status)) {
     return res.status(400).json({ message: 'Invalid order status.' })
   }
 
@@ -84,28 +127,46 @@ router.patch('/orders/:id/status', requireAdmin, async (req, res) => {
   }
 
   try {
+    const previous = await Order.findById(req.params.id).lean()
+
+    if (!previous) {
+      return res.status(404).json({ message: 'Order not found.' })
+    }
+
     const order = await Order.findByIdAndUpdate(
       req.params.id,
       { $set: { orderStatus: status } },
       { returnDocument: 'after', runValidators: true },
     )
 
-    if (!order) {
-      return res.status(404).json({ message: 'Order not found.' })
+    // Cancelling an order gives the reserved stock back to the catalog.
+    if (status === 'cancelled' && previous.orderStatus !== 'cancelled') {
+      for (const item of previous.items || []) {
+        try {
+          await Product.updateOne(
+            { productId: item.productId },
+            { $inc: { stock: item.quantity } },
+          )
+        } catch (err) {
+          console.error(
+            'Stock restore failed for',
+            item.productId,
+            err.message,
+          )
+        }
+      }
     }
 
     res.set('Cache-Control', 'private, no-store')
     return res.json({ success: true, order })
   } catch (error) {
     console.error('Order status update failed:', error.message)
-    return res.status(500).json({ message: 'Status update nahi hua.' })
+    return res.status(500).json({ message: 'Order status could not be updated.' })
   }
 })
 
 router.delete('/orders/:id', requireAdmin, async (req, res) => {
-  const allowedOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173'
-
-  if (req.get('Origin') !== allowedOrigin) {
+  if (!isAllowedOrigin(req)) {
     return res.status(403).json({ message: 'Request origin is not allowed.' })
   }
 
@@ -117,14 +178,14 @@ router.delete('/orders/:id', requireAdmin, async (req, res) => {
     const order = await Order.findByIdAndDelete(req.params.id)
 
     if (!order) {
-      return res.status(404).json({ message: 'Order pehle hi delete ho chuka hai.' })
+      return res.status(404).json({ message: 'This order was already deleted.' })
     }
 
     res.set('Cache-Control', 'private, no-store')
     return res.json({ success: true, message: 'Order deleted.' })
   } catch (error) {
     console.error('Order deletion failed:', error.message)
-    return res.status(500).json({ message: 'Order delete nahi hua.' })
+    return res.status(500).json({ message: 'Order could not be deleted.' })
   }
 })
 
@@ -139,14 +200,12 @@ router.get('/messages', requireAdmin, async (req, res) => {
     return res.json({ success: true, messages })
   } catch (error) {
     console.error('Admin messages failed:', error.message)
-    return res.status(500).json({ message: 'Messages load nahi hue.' })
+    return res.status(500).json({ message: 'Messages could not be loaded.' })
   }
 })
 
 router.patch('/messages/:id/read', requireAdmin, async (req, res) => {
-  const allowedOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173'
-
-  if (req.get('Origin') !== allowedOrigin) {
+  if (!isAllowedOrigin(req)) {
     return res.status(403).json({ message: 'Request origin is not allowed.' })
   }
 
@@ -169,14 +228,12 @@ router.patch('/messages/:id/read', requireAdmin, async (req, res) => {
     return res.json({ success: true, message })
   } catch (error) {
     console.error('Message update failed:', error.message)
-    return res.status(500).json({ message: 'Status update nahi hua.' })
+    return res.status(500).json({ message: 'Status could not be updated.' })
   }
 })
 
 router.delete('/messages/:id', requireAdmin, async (req, res) => {
-  const allowedOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173'
-
-  if (req.get('Origin') !== allowedOrigin) {
+  if (!isAllowedOrigin(req)) {
     return res.status(403).json({ message: 'Request origin is not allowed.' })
   }
 
@@ -188,14 +245,14 @@ router.delete('/messages/:id', requireAdmin, async (req, res) => {
     const message = await Message.findByIdAndDelete(req.params.id)
 
     if (!message) {
-      return res.status(404).json({ message: 'Message pehle hi delete ho chuka hai.' })
+      return res.status(404).json({ message: 'This message was already deleted.' })
     }
 
     res.set('Cache-Control', 'private, no-store')
     return res.json({ success: true, message: 'Message deleted.' })
   } catch (error) {
     console.error('Message deletion failed:', error.message)
-    return res.status(500).json({ message: 'Message delete nahi hua.' })
+    return res.status(500).json({ message: 'Message could not be deleted.' })
   }
 })
 
@@ -342,14 +399,12 @@ router.get('/products', requireAdmin, async (req, res) => {
     return res.json({ success: true, summary, products })
   } catch (error) {
     console.error('Admin products failed:', error.message)
-    return res.status(500).json({ message: 'Products load nahi hue.' })
+    return res.status(500).json({ message: 'Products could not be loaded.' })
   }
 })
 
 router.post('/products', requireAdmin, async (req, res) => {
-  const allowedOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173'
-
-  if (req.get('Origin') !== allowedOrigin) {
+  if (!isAllowedOrigin(req)) {
     return res.status(403).json({ message: 'Request origin is not allowed.' })
   }
 
@@ -383,14 +438,12 @@ router.post('/products', requireAdmin, async (req, res) => {
     return res.status(201).json({ success: true, product })
   } catch (error) {
     console.error('Product create failed:', error.message)
-    return res.status(500).json({ message: 'Product nahi bana.' })
+    return res.status(500).json({ message: 'Product could not be created.' })
   }
 })
 
 router.patch('/products/:id', requireAdmin, async (req, res) => {
-  const allowedOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173'
-
-  if (req.get('Origin') !== allowedOrigin) {
+  if (!isAllowedOrigin(req)) {
     return res.status(403).json({ message: 'Request origin is not allowed.' })
   }
 
@@ -423,7 +476,7 @@ router.patch('/products/:id', requireAdmin, async (req, res) => {
     return res.json({ success: true, product })
   } catch (error) {
     console.error('Product update failed:', error.message)
-    return res.status(500).json({ message: 'Product update nahi hua.' })
+    return res.status(500).json({ message: 'Product could not be updated.' })
   }
 })
 

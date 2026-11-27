@@ -3,8 +3,8 @@ const { pathToFileURL } = require('url')
 
 try {
   require('dotenv').config({ path: path.join(__dirname, '.env') })
-} catch (error) {
-  // dotenv na ho to neeche wali check bata degi
+} catch {
+  // dotenv optional hai; neeche wali MONGODB_URI check bata degi
 }
 
 const mongoose = require('mongoose')

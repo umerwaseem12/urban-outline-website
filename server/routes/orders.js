@@ -37,14 +37,14 @@ router.post('/', async (req, res) => {
     ) {
       return res.status(400).json({
         success: false,
-        message: 'Delivery details complete karein.',
+        message: 'Please complete your delivery details.',
       })
     }
 
     if (!Array.isArray(items) || items.length === 0 || items.length > 50) {
       return res.status(400).json({
         success: false,
-        message: 'Order mein valid products add karein.',
+        message: 'Please add at least one product to your order.',
       })
     }
 
@@ -52,26 +52,31 @@ router.post('/', async (req, res) => {
     if (!allowedPaymentMethods.includes(paymentMethod)) {
       return res.status(400).json({
         success: false,
-        message: 'Payment method valid nahi hai.',
+        message: 'That payment method is not available.',
       })
     }
 
-    // Ek hi product do baar aaye to quantity jama kar lo.
+    // Same product with the same size/colour is merged into one line.
     const wanted = new Map()
     for (const item of items) {
       const productId = String(item?.id ?? item?.productId ?? '').trim()
       const quantity = Number(item?.quantity ?? 1)
+      const size = typeof item?.size === 'string' ? item.size.trim() : ''
+      const color = typeof item?.color === 'string' ? item.color.trim() : ''
 
       if (!productId || !Number.isInteger(quantity) || quantity < 1) {
         return res.status(400).json({
           success: false,
-          message: 'Order mein product details valid nahi hain.',
+          message: 'Some product details in this order are invalid.',
         })
       }
 
-      const existing = wanted.get(productId)
-      wanted.set(productId, {
+      const lineKey = `${productId}|${size}|${color}`
+      const existing = wanted.get(lineKey)
+      wanted.set(lineKey, {
         productId,
+        size,
+        color,
         quantity: (existing?.quantity ?? 0) + quantity,
         image: existing?.image ?? item.image,
       })
@@ -83,7 +88,7 @@ router.post('/', async (req, res) => {
       if (entry.quantity > 20) {
         return res.status(400).json({
           success: false,
-          message: 'Order mein product details valid nahi hain.',
+          message: 'You can order at most 20 pieces of one item.',
         })
       }
 
@@ -106,13 +111,13 @@ router.post('/', async (req, res) => {
           productId: entry.productId,
         }).lean()
 
-        let message = 'Order mein product details valid nahi hain.'
+        let message = 'Some product details in this order are invalid.'
         if (current && current.active === false) {
-          message = `"${current.name}" ab available nahi hai. Cart se hata dein.`
+          message = `"${current.name}" is no longer available. Please remove it from your bag.`
         } else if (current && current.stock <= 0) {
-          message = `"${current.name}" out of stock hai.`
+          message = `"${current.name}" is out of stock.`
         } else if (current) {
-          message = `"${current.name}" ke sirf ${current.stock} bache hain. Quantity kam karein.`
+          message = `Only ${current.stock} of "${current.name}" left. Please lower the quantity.`
         }
 
         return res.status(409).json({ success: false, message })
@@ -127,6 +132,8 @@ router.post('/', async (req, res) => {
           typeof entry.image === 'string'
             ? entry.image.slice(0, 500)
             : product.image || '',
+        size: entry.size,
+        color: entry.color,
         price: Number(product.price),
         quantity: entry.quantity,
       })
@@ -158,7 +165,7 @@ router.post('/', async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: 'Order database mein save ho gaya.',
+      message: 'Order placed successfully.',
       orderId: order._id,
       subtotal: order.subtotal,
       shippingFee: order.shippingFee,
@@ -170,7 +177,7 @@ router.post('/', async (req, res) => {
     console.error('Order create failed:', error.message)
     return res.status(500).json({
       success: false,
-      message: 'Order save nahi ho saka.',
+      message: 'We could not save this order. Please try again.',
     })
   }
 })

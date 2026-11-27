@@ -11,7 +11,7 @@ const contactLimiter = rateLimit({
   legacyHeaders: false,
   message: {
     success: false,
-    message: 'Bohot zyada messages bheje gaye hain. Thori der baad try karein.',
+    message: 'Too many messages. Please try again shortly.',
   },
 })
 
@@ -31,7 +31,7 @@ router.post('/', contactLimiter, async (req, res) => {
     ) {
       return res.status(400).json({
         success: false,
-        message: 'Name, sahi email, subject aur message likhna zaroori hai.',
+        message: 'Name, a valid email, subject and message are required.',
       })
     }
 
@@ -44,14 +44,14 @@ router.post('/', contactLimiter, async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: 'Aap ka message mil gaya hai. Hamari team jald rabta karegi.',
+      message: 'Thanks for reaching out. Our team will reply soon.',
     })
   } catch (error) {
     console.error('Contact message failed:', error.message)
 
     return res.status(500).json({
       success: false,
-      message: 'Message save nahi ho saka. Thori der baad try karein.',
+      message: 'We could not save your message. Please try again shortly.',
     })
   }
 })

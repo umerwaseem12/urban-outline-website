@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   ArrowLeft,
@@ -19,7 +19,7 @@ function getDefaultSizes(group) {
     return ['0–3M', '3–6M', '6–12M', '12–18M']
   }
 
-  if (group === 'kids') {
+  if (group === 'boys' || group === 'girls' || group === 'kids') {
     return ['2–3Y', '4–5Y', '6–7Y', '8–9Y', '10–12Y']
   }
 
@@ -34,29 +34,23 @@ export default function ProductDetail({
   isFavourite = false,
   onToggleWishlist,
 }) {
-  const images = useMemo(() => {
-    if (Array.isArray(product?.images)) {
-      return [...new Set(product.images.filter(Boolean))]
-    }
+  // App remounts this view per product (key={product.id}), so a plain
+  // computation is enough; no memoisation needed.
+  const images = Array.isArray(product?.images)
+    ? [...new Set(product.images.filter(Boolean))]
+    : product?.image
+      ? [product.image]
+      : []
 
-    return product?.image ? [product.image] : []
-  }, [product?.id, product?.image, product?.images])
-
-  const [activeImage, setActiveImage] = useState('')
+  // App remounts this view per product (key={product.id}), so the initial
+  // state below is enough and no reset effect is needed.
+  const [activeImage, setActiveImage] = useState(() => images[0] || '')
   const [selectedSize, setSelectedSize] = useState('')
-  const [selectedColor, setSelectedColor] = useState('As shown')
+  const [selectedColor, setSelectedColor] = useState(
+    () => product?.colors?.[0]?.name || product?.colors?.[0] || 'As shown',
+  )
   const [quantity, setQuantity] = useState(1)
   const [sizeError, setSizeError] = useState('')
-
-  useEffect(() => {
-    setActiveImage(images[0] || '')
-    setSelectedSize('')
-    setSelectedColor(
-      product?.colors?.[0]?.name || product?.colors?.[0] || 'As shown',
-    )
-    setQuantity(1)
-    setSizeError('')
-  }, [product?.id, images])
 
   const sizes =
     product?.sizes?.length > 0
@@ -69,14 +63,20 @@ export default function ProductDetail({
       : [{ name: 'As shown', hex: '#a99b89' }]
 
   const needsSize = !/bag|accessor/i.test(product?.category || '')
+  const soldOut = product?.inStock === false
   const discount =
     product?.oldPrice > product?.price
       ? Math.round((1 - product.price / product.oldPrice) * 100)
       : null
 
   function handlePurchase(action) {
+    if (soldOut) {
+      setSizeError('This piece is sold out.')
+      return
+    }
+
     if (needsSize && !selectedSize) {
-      setSizeError('Select your Size')
+      setSizeError('Please select your size.')
       return
     }
 
@@ -98,14 +98,14 @@ export default function ProductDetail({
     return (
       <section className="mx-auto max-w-5xl px-5 py-20 text-center">
         <h1 className="font-display text-2xl font-semibold">
-          Product nahi mila
+          Product not found
         </h1>
         <button
           type="button"
           onClick={onBack}
           className="mt-5 text-sm font-semibold text-brand"
         >
-          Wapas products par jao
+          Back to products
         </button>
       </section>
     )
@@ -159,13 +159,14 @@ export default function ProductDetail({
                 alt={product.name}
                 initial={{ opacity: 0.6 }}
                 animate={{ opacity: 1 }}
+                onError={() => setActiveImage('')}
                 className="h-full max-h-[760px] w-full object-contain"
               />
             ) : (
               <div className="flex flex-col items-center gap-3 px-5 text-center text-[var(--muted)]">
                 <ShoppingBag size={38} strokeWidth={1.2} />
                 <span className="text-xs font-semibold uppercase tracking-[0.15em]">
-                  Product image add karein
+                  Product image coming soon
                 </span>
               </div>
             )}
@@ -206,7 +207,7 @@ export default function ProductDetail({
 
           <p className="text-sm leading-6 text-[var(--muted)]">
             {product.description ||
-              'Product ki fabric, fit aur care details yahan add ki jayengi.'}
+              'Fabric, fit and care details for this piece are coming soon.'}
           </p>
 
           {/* Color selector */}
@@ -256,7 +257,8 @@ export default function ProductDetail({
                 <details className="text-xs text-brand">
                   <summary className="cursor-pointer">Size guide</summary>
                   <p className="mt-2 max-w-xs leading-5 text-[var(--muted)]">
-                  
+                    Pick your usual size. Between two sizes? Size up for a
+                    relaxed fit.
                   </p>
                 </details>
               </div>
@@ -305,11 +307,16 @@ export default function ProductDetail({
           <p className="text-2xl font-semibold">{formatPrice(product.price)}</p>
 
           <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
-          
+            Cash on delivery across Pakistan. Delivery charges are added at
+            checkout.
           </p>
 
-          <p className="mt-5 text-sm font-semibold text-emerald-700">
-            Stock status checkout par confirm hoga
+          <p
+            className={`mt-5 text-sm font-semibold ${
+              soldOut ? 'text-red-600' : 'text-emerald-700'
+            }`}
+          >
+            {soldOut ? 'Sold out' : 'In stock · ready to ship'}
           </p>
 
           <label
@@ -323,6 +330,7 @@ export default function ProductDetail({
             <button
               type="button"
               onClick={() => setQuantity((current) => Math.max(1, current - 1))}
+              disabled={soldOut}
               aria-label="Decrease quantity"
               className="p-2.5"
             >
@@ -338,7 +346,8 @@ export default function ProductDetail({
 
             <button
               type="button"
-              onClick={() => setQuantity((current) => current + 1)}
+              onClick={() => setQuantity((current) => Math.min(20, current + 1))}
+              disabled={soldOut}
               aria-label="Increase quantity"
               className="p-2.5"
             >
@@ -349,18 +358,20 @@ export default function ProductDetail({
           <button
             type="button"
             onClick={() => handlePurchase('cart')}
-            className="mt-5 flex w-full items-center justify-center gap-2 bg-brand px-4 py-3.5 text-xs font-bold uppercase tracking-[0.12em] text-white transition-colors hover:bg-brand-dark"
+            disabled={soldOut}
+            className="mt-5 flex w-full items-center justify-center gap-2 bg-brand px-4 py-3.5 text-xs font-bold uppercase tracking-[0.12em] text-white transition-colors hover:bg-brand-dark disabled:cursor-not-allowed disabled:bg-[#8d8a83]"
           >
             <ShoppingBag size={16} />
-            Add to Cart
+            {soldOut ? 'Sold out' : 'Add to Cart'}
           </button>
 
           <button
             type="button"
             onClick={() => handlePurchase('buy')}
-            className="mt-3 w-full border border-[var(--line)] px-4 py-3.5 text-xs font-bold uppercase tracking-[0.12em] transition-colors hover:border-brand hover:text-brand"
+            disabled={soldOut}
+            className="mt-3 w-full border border-[var(--line)] px-4 py-3.5 text-xs font-bold uppercase tracking-[0.12em] transition-colors hover:border-brand hover:text-brand disabled:cursor-not-allowed disabled:border-[var(--line)] disabled:text-[var(--muted)] disabled:hover:border-[var(--line)] disabled:hover:text-[var(--muted)]"
           >
-            Buy now
+            {soldOut ? 'Sold out' : 'Buy now'}
           </button>
 
           <button
@@ -378,11 +389,11 @@ export default function ProductDetail({
           <div className="mt-5 space-y-3 border-t border-[var(--line)] pt-4 text-[11px] text-[var(--muted)]">
             <p className="flex items-center gap-2">
               <ShieldCheck size={15} className="shrink-0 text-brand" />
-             
+              Secure checkout · cash on delivery
             </p>
             <p className="flex items-center gap-2">
               <Truck size={15} className="shrink-0 text-brand" />
-              
+              Delivered in 3–5 working days
             </p>
           </div>
         </aside>

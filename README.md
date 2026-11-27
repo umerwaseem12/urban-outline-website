@@ -1,16 +1,86 @@
-# React + Vite
+# Urban Outline
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Clothing store for men, women, boys and girls, built as a React single-page app with an Express + MongoDB backend.
 
-Currently, two official plugins are available:
+Live store: <https://urban-outline.vercel.app/>
+API: <https://urban-outline-backend.vercel.app/api/health>
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Stack
 
-## React Compiler
+| Part     | Tech                                                             |
+| -------- | ---------------------------------------------------------------- |
+| Frontend | React 19, Vite, Tailwind CSS v4, framer-motion, lucide-react      |
+| Backend  | Express 5, Mongoose 9, JWT-cookie sessions, bcrypt, Nodemailer     |
+| Database | MongoDB (products, orders, users, sessions, messages)             |
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Project layout
 
-## Expanding the ESLint configuration
+```
+src/            React app (App.jsx holds the storefront shell)
+src/Pages/      Account, Checkout, ProductDetail, Admin (at /dev.urban), ...
+shared/         Catalog fallback data used before/without the API
+server/         Express API (routes, models, seed script)
+public/         Static images and icons
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Local setup
+
+```bash
+# 1. Frontend
+npm install
+cp .env.example .env      # set VITE_API_URL and VITE_GOOGLE_CLIENT_ID
+npm run dev               # http://localhost:5173
+
+# 2. Backend (second terminal)
+cd server
+npm install
+cp .env.example .env      # set MONGODB_URI at minimum
+node seed-products.js     # first run only: seed the 100 product catalog
+npm start
+```
+
+The frontend falls back to `shared/catalog.mjs` when the API is unreachable, so
+the site still renders without a backend. Login, checkout, contact and the chat
+assistant need the API.
+
+## Scripts
+
+| Command           | What it does                        |
+| ----------------- | ----------------------------------- |
+| `npm run dev`     | Start Vite with hot reload          |
+| `npm run build`   | Production build into `dist/`       |
+| `npm run preview` | Serve the production build locally  |
+| `npm run lint`    | ESLint for frontend and backend     |
+
+## Environment variables
+
+Frontend (`.env`, see `.env.example`):
+
+- `VITE_API_URL` – backend base URL, no trailing slash
+- `VITE_GOOGLE_CLIENT_ID` – Google OAuth client ID
+
+Backend (`server/.env`, see `server/.env.example`):
+
+- `MONGODB_URI` (required), `PORT`, `CLIENT_ORIGIN`, `NODE_ENV`
+- `GOOGLE_CLIENT_ID`, `GEMINI_API_KEY`, `GEMINI_MODEL`
+- `GMAIL_USER`, `GMAIL_APP_PASSWORD`
+
+Set `NODE_ENV=production` on the deployed API so session cookies are `secure`
+and `sameSite=none`; `CLIENT_ORIGIN` must match the storefront origin exactly.
+
+## Deployment
+
+- **Frontend:** Vercel. Set `VITE_API_URL` (and `VITE_GOOGLE_CLIENT_ID`) in the
+  project's environment variables before building, otherwise the build falls
+  back to `http://localhost:5000`.
+- **Backend:** Vercel/host of your choice. Set the server env vars, and add the
+  storefront origin to `CLIENT_ORIGIN` so CORS and cookies work.
+
+`vercel.json` rewrites every non-API path to `index.html` so direct links and
+page refreshes keep working.
+
+## Admin
+
+The CMS lives at `/dev.urban`. It requires signing in with a user whose `role`
+is `admin`; every `/api/admin/*` route is protected server-side by
+`requireAdmin`.

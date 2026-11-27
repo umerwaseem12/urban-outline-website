@@ -11,6 +11,7 @@ import ChatAssistant from './Pages/ChatAssistant.jsx'
 import { API_BASE } from './config'
 
 import {
+  ArrowLeft,
   ArrowRight,
   Heart,
   Menu,
@@ -41,6 +42,45 @@ const navItems = [
 
 const formatPrice = (amount) =>
   `Rs. ${new Intl.NumberFormat('en-PK').format(amount)}`
+const PRODUCTS_PER_PAGE = 12
+const CART_STORAGE_KEY = 'urban-outline-cart'
+const FAVOURITES_STORAGE_KEY = 'urban-outline-favourites'
+const MAX_QUANTITY_PER_LINE = 20
+const GROUP_IDS = ['men', 'women', 'boys', 'girls']
+
+const readStoredList = (key) => {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(key) || '[]')
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+const cartLineKey = (item) =>
+  [item.id, item.size || '', item.color || ''].join('|')
+
+const groupFromHash = () => {
+  const group = window.location.hash.replace(/^#\/?/, '').toLowerCase()
+  return GROUP_IDS.includes(group) ? group : ''
+}
+const getPageItems = (page, pageCount) => {
+  if (pageCount <= 7) {
+    return Array.from({ length: pageCount }, (_, index) => index + 1)
+  }
+
+  const items = [1]
+  const start = Math.max(2, page - 1)
+  const end = Math.min(pageCount - 1, page + 1)
+
+  if (start > 2) items.push('start-ellipsis')
+  for (let current = start; current <= end; current += 1) items.push(current)
+  if (end < pageCount - 1) items.push('end-ellipsis')
+
+  items.push(pageCount)
+
+  return items
+}
 const categories = catalogGroups.map((group) => ({
   id: group.id,
   title: group.title,
@@ -67,6 +107,72 @@ function Logo() {
         className="h-14 w-14 shrink-0 rounded-full border border-[var(--line)] object-cover"
       />
     </a>
+  )
+}
+
+function Pagination({ page, pageCount, onChange }) {
+  if (pageCount <= 1) return null
+
+  return (
+    <nav
+      aria-label="Product pagination"
+      className="mt-12 flex flex-col items-center gap-5 border-t border-[var(--line)] pt-8"
+    >
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        <motion.button
+          type="button"
+          onClick={() => onChange(page - 1)}
+          disabled={page === 1}
+          aria-label="Previous page"
+          whileHover={{ y: -2 }}
+          whileTap={{ scale: 0.94 }}
+          className="flex h-10 w-10 items-center justify-center border border-[var(--line)] transition-colors hover:border-brand hover:text-brand disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:border-[var(--line)] disabled:hover:text-inherit"
+        >
+          <ArrowLeft size={16} />
+        </motion.button>
+
+        {getPageItems(page, pageCount).map((item) =>
+          typeof item === 'number' ? (
+            <motion.button
+              key={item}
+              type="button"
+              onClick={() => onChange(item)}
+              aria-label={`Page ${item}`}
+              aria-current={item === page ? 'page' : undefined}
+              whileHover={{ y: -2 }}
+              whileTap={{ scale: 0.94 }}
+              className={
+                item === page
+                  ? 'flex h-10 min-w-10 items-center justify-center border border-[#201f1c] bg-[#201f1c] px-3 text-xs font-bold text-white dark:border-[#f2efe9] dark:bg-[#f2efe9] dark:text-[#201f1c]'
+                  : 'flex h-10 min-w-10 items-center justify-center border border-[var(--line)] px-3 text-xs font-bold transition-colors hover:border-brand hover:text-brand'
+              }
+            >
+              {item}
+            </motion.button>
+          ) : (
+            <span
+              key={item}
+              aria-hidden="true"
+              className="flex h-10 w-8 items-center justify-center text-xs text-[var(--muted)]"
+            >
+              …
+            </span>
+          ),
+        )}
+
+        <motion.button
+          type="button"
+          onClick={() => onChange(page + 1)}
+          disabled={page === pageCount}
+          aria-label="Next page"
+          whileHover={{ y: -2 }}
+          whileTap={{ scale: 0.94 }}
+          className="flex h-10 w-10 items-center justify-center border border-[var(--line)] transition-colors hover:border-brand hover:text-brand disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:border-[var(--line)] disabled:hover:text-inherit"
+        >
+          <ArrowRight size={16} />
+        </motion.button>
+      </div>
+    </nav>
   )
 }
 
@@ -105,30 +211,41 @@ function SectionHeading({ eyebrow, title, description, link }) {
 
 function ProductCard({
   product,
+  index = 0,
   onAdd,
   onView,
   isFavourite,
   onToggleFavourite,
-  quantity,
+  cartLine,
+  quantityTotal = 0,
   onChangeQuantity,
   onRemove,
 }) {
+  const quantity = cartLine?.quantity || 0
+  const soldOut = product.inStock === false
+  const [imageFailed, setImageFailed] = useState(false)
+
   return (
     <motion.article
-      layout
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, amount: 0.15 }}
-      transition={{ duration: 0.45 }}
+      initial={{ opacity: 0, y: 26, scale: 0.985 }}
+      whileInView={{ opacity: 1, y: 0, scale: 1 }}
+      whileHover={{ y: -6 }}
+      viewport={{ once: true, amount: 0.12 }}
+      transition={{
+        duration: 0.5,
+        delay: Math.min(index * 0.045, 0.36),
+        ease: [0.22, 1, 0.36, 1],
+      }}
       className="group min-w-0"
     >
-      <div className="relative aspect-[4/5] overflow-hidden rounded-sm bg-[#efede8] dark:bg-[#292824]">
-        {product.image ? (
+      <div className="relative aspect-[4/5] overflow-hidden rounded-sm bg-[#efede8] transition-shadow duration-500 group-hover:shadow-[0_22px_45px_-24px_rgba(25,24,21,0.55)] dark:bg-[#292824]">
+        {product.image && !imageFailed ? (
           <motion.img
             src={product.image}
             alt={product.name}
             loading="lazy"
             onClick={() => onView(product)}
+            onError={() => setImageFailed(true)}
             whileHover={{ scale: 1.045 }}
             transition={{ duration: 0.55 }}
             className="h-full w-full cursor-pointer object-cover"
@@ -141,17 +258,25 @@ function ProductCard({
           </div>
         )}
 
-        {product.badge && (
-          <span className="absolute left-3 top-3 bg-[var(--surface)] px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-[0.15em]">
-            {product.badge}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+
+        {soldOut ? (
+          <span className="absolute left-3 top-3 bg-[#201f1c] px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-[0.15em] text-white">
+            Sold out
           </span>
+        ) : (
+          product.badge && (
+            <span className="absolute left-3 top-3 bg-[var(--surface)] px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-[0.15em]">
+              {product.badge}
+            </span>
+          )
         )}
 
         <button
           type="button"
           onClick={() => onToggleFavourite(product.id)}
           aria-label={isFavourite ? 'Remove from wishlist' : 'Add to wishlist'}
-          className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-[var(--surface)] transition-transform hover:scale-105"
+          className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-[var(--surface)] transition-transform hover:scale-105 active:scale-90"
         >
           <Heart
             size={16}
@@ -165,7 +290,7 @@ function ProductCard({
               <div className="flex items-center rounded-sm border border-white/20 bg-[#201f1c] text-white shadow-md">
                 <button
                   type="button"
-                  onClick={() => onChangeQuantity(product.id, -1)}
+                  onClick={() => onChangeQuantity(cartLine.key, -1)}
                   aria-label={`Decrease ${product.name} quantity`}
                   className="flex h-10 w-10 items-center justify-center transition-colors hover:text-[#db7657]"
                 >
@@ -181,7 +306,7 @@ function ProductCard({
 
                 <button
                   type="button"
-                  onClick={() => onChangeQuantity(product.id, 1)}
+                  onClick={() => onChangeQuantity(cartLine.key, 1)}
                   aria-label={`Increase ${product.name} quantity`}
                   className="flex h-10 w-10 items-center justify-center transition-colors hover:text-[#db7657]"
                 >
@@ -192,7 +317,7 @@ function ProductCard({
               <button
                 type="button"
                 onClick={() => onRemove(product.id)}
-                aria-label={`Remove ${product.name} from cart`}
+                aria-label={`Remove ${product.name} from bag`}
                 className="flex h-10 w-10 items-center justify-center rounded-sm bg-[#201f1c] text-white shadow-md transition-colors hover:bg-[#db7657]"
               >
                 <Trash2 size={16} />
@@ -202,9 +327,10 @@ function ProductCard({
             <button
               type="button"
               onClick={() => onAdd(product)}
-              className="inline-flex min-h-10 items-center justify-center rounded-sm bg-[#201f1c] px-5 py-2 text-xs font-bold uppercase tracking-[0.12em] text-white shadow-md transition-colors hover:bg-[#db7657]"
+              disabled={soldOut}
+              className="inline-flex min-h-10 items-center justify-center rounded-sm bg-[#201f1c] px-5 py-2 text-xs font-bold uppercase tracking-[0.12em] text-white shadow-md transition-all hover:bg-[#db7657] active:scale-95 disabled:cursor-not-allowed disabled:bg-[#8d8a83] disabled:hover:bg-[#8d8a83]"
             >
-              Buy now
+              {soldOut ? 'Sold out' : 'Buy now'}
             </button>
           )}
         </div>
@@ -214,6 +340,7 @@ function ProductCard({
         <div>
           <p className="text-[10px] uppercase tracking-[0.14em] text-[var(--muted)]">
             {product.category}
+            {quantityTotal > 1 ? ` · ${quantityTotal} in bag` : ''}
           </p>
 
           <button
@@ -286,10 +413,13 @@ function ProductCard({
       })
       .catch(() => {
         setVerifyStatus('error')
-        setVerifyMessage('Server se connection nahi ho raha. Dobara try karein.')
+        setVerifyMessage(
+          'Could not reach the server. Please try again in a moment.',
+        )
       })
   }, [verifyToken])
-  const [products, setProducts] = useState(catalogProducts)
+  const [products, setProducts] = useState([])
+  const [productsLoading, setProductsLoading] = useState(true)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -300,16 +430,22 @@ function ProductCard({
           signal: controller.signal,
         })
 
-        if (!response.ok) return
+        if (response.ok) {
+          const data = await response.json()
 
-        const data = await response.json()
-
-        if (Array.isArray(data.products) && data.products.length > 0) {
-          setProducts(data.products)
+          if (Array.isArray(data.products) && data.products.length > 0) {
+            setProducts(data.products)
+            setProductsLoading(false)
+            return
+          }
         }
       } catch {
-        // Backend na mile to purani catalog wali list hi chalti rahe.
+        if (controller.signal.aborted) return
       }
+
+      // Backend not reachable: keep the bundled catalog so browsing still works.
+      setProducts(catalogProducts)
+      setProductsLoading(false)
     }
 
     loadProducts()
@@ -322,22 +458,36 @@ function ProductCard({
   )
   const [searchOpen, setSearchOpen] = useState(false)
 const [searchQuery, setSearchQuery] = useState('')
-const [selectedGroup, setSelectedGroup] = useState('')
+const [selectedGroup, setSelectedGroup] = useState(groupFromHash)
+const [pagination, setPagination] = useState({ key: '', page: 1 })
 const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 const [cartOpen, setCartOpen] = useState(false)
 const [checkoutOpen, setCheckoutOpen] = useState(false)
 const [completedOrder, setCompletedOrder] = useState(null)
-const [cartItems, setCartItems] = useState([])
-const [favourites, setFavourites] = useState([])
+const [cartItems, setCartItems] = useState(() =>
+  readStoredList(CART_STORAGE_KEY)
+    .filter((item) => item && typeof item.id === 'string')
+    .map((item) => {
+      const line = { ...item }
+      line.key = item.key || cartLineKey(line)
+      line.quantity = Math.min(
+        Math.max(1, Number(item.quantity) || 1),
+        MAX_QUANTITY_PER_LINE,
+      )
+      return line
+    }),
+)
+const [favourites, setFavourites] = useState(() =>
+  readStoredList(FAVOURITES_STORAGE_KEY).filter(
+    (id) => typeof id === 'string',
+  ),
+)
+const [wishlistOpen, setWishlistOpen] = useState(false)
 const [selectedProduct, setSelectedProduct] = useState(null)
 const [contactOpen, setContactOpen] = useState(false)
 const [accountOpen, setAccountOpen] = useState(false)
 const [headerUser, setHeaderUser] = useState(null)
-const [headerPhotoFailed, setHeaderPhotoFailed] = useState(false)
-
-useEffect(() => {
-  setHeaderPhotoFailed(false)
-}, [headerUser?.id, headerUser?.profilePicture])
+const [failedPhotoKey, setFailedPhotoKey] = useState('')
 
 useEffect(() => {
   if (accountOpen) return
@@ -390,6 +540,52 @@ const [searchFocused, setSearchFocused] = useState(false)
   }, [isDark])
 
   useEffect(() => {
+    window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cartItems))
+  }, [cartItems])
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      FAVOURITES_STORAGE_KEY,
+      JSON.stringify(favourites),
+    )
+  }, [favourites])
+
+  useEffect(() => {
+    const syncFromHash = () => {
+      setSelectedGroup(groupFromHash())
+      setSearchQuery('')
+      setWishlistOpen(false)
+    }
+
+    window.addEventListener('popstate', syncFromHash)
+    window.addEventListener('hashchange', syncFromHash)
+
+    return () => {
+      window.removeEventListener('popstate', syncFromHash)
+      window.removeEventListener('hashchange', syncFromHash)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!cartOpen && !wishlistOpen) return undefined
+
+    const handleKeyDown = (event) => {
+      if (event.key !== 'Escape') return
+      setCartOpen(false)
+      setWishlistOpen(false)
+    }
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [cartOpen, wishlistOpen])
+
+  useEffect(() => {
     if (!toast) return undefined
 
     const timer = window.setTimeout(() => setToast(''), 2500)
@@ -411,6 +607,26 @@ const [searchFocused, setSearchFocused] = useState(false)
     return matchesGroup && matchesQuery
   })
 }, [searchQuery, selectedGroup, products])
+
+  const pageCount = Math.max(
+    1,
+    Math.ceil(visibleProducts.length / PRODUCTS_PER_PAGE),
+  )
+
+  const paginationKey = `${selectedGroup}|${searchQuery}`
+  const currentPage = Math.min(
+    pagination.key === paginationKey ? pagination.page : 1,
+    pageCount,
+  )
+
+  const pagedProducts = useMemo(
+    () =>
+      visibleProducts.slice(
+        (currentPage - 1) * PRODUCTS_PER_PAGE,
+        currentPage * PRODUCTS_PER_PAGE,
+      ),
+    [visibleProducts, currentPage],
+  )
 
   const cartCount = cartItems.reduce(
     (total, item) => total + item.quantity,
@@ -450,36 +666,116 @@ const [searchFocused, setSearchFocused] = useState(false)
     0,
   )
 
-  function addToCart(product) {
+  function selectGroup(group) {
+    const next = GROUP_IDS.includes(group) ? group : ''
+
+    setSelectedGroup(next)
+    setSearchQuery('')
+    setSearchOpen(false)
+    setSearchFocused(false)
+    setMobileMenuOpen(false)
+
+    window.history.pushState(
+      null,
+      '',
+      next ? `#/${next}` : window.location.pathname,
+    )
+
+    window.setTimeout(() => {
+      document.getElementById('product-grid')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
+    }, 100)
+  }
+
+  function addToCart(product, options = {}) {
+    if (product.inStock === false) {
+      setCartToast(null)
+      setToast(`${product.name} is sold out.`)
+      return
+    }
+
+    const line = {
+      ...product,
+      size: options.size || null,
+      color: options.color || null,
+    }
+    const key = cartLineKey(line)
+    const quantity = Math.min(
+      Math.max(1, Number(options.quantity) || 1),
+      MAX_QUANTITY_PER_LINE,
+    )
+
     setCartItems((currentItems) => {
-      const existingItem = currentItems.find(
-        (item) => item.id === product.id,
-      )
+      const existingItem = currentItems.find((item) => item.key === key)
 
       if (existingItem) {
         return currentItems.map((item) =>
-          item.id === product.id
-            ? { ...item, quantity: item.quantity + 1 }
+          item.key === key
+            ? {
+                ...item,
+                quantity: Math.min(
+                  item.quantity + quantity,
+                  MAX_QUANTITY_PER_LINE,
+                ),
+              }
             : item,
         )
       }
 
-      return [...currentItems, { ...product, quantity: 1 }]
+      return [...currentItems, { ...line, key, quantity }]
     })
 
     setToast('')
-setCartToast({ productName: product.name })
+    setCartToast({ productName: product.name, size: options.size || '' })
   }
 
-  function changeQuantity(productId, change) {
+  // Clothing needs a size, so a card's "Buy now" opens the product page and
+  // the customer picks a size there instead of a size-less line in the bag.
+  function handleCardAdd(product) {
+    if (!/bag|accessor/i.test(product?.category || '')) {
+      setSelectedProduct(product)
+      return
+    }
+
+    addToCart(product)
+  }
+
+  function goToPage(page) {
+    if (page < 1 || page > pageCount || page === currentPage) return
+
+    setPagination({ key: paginationKey, page })
+
+    window.setTimeout(() => {
+      document.getElementById('product-grid')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
+    }, 80)
+  }
+
+  function changeQuantity(lineKey, change) {
     setCartItems((currentItems) =>
       currentItems
         .map((item) =>
-          item.id === productId
-            ? { ...item, quantity: item.quantity + change }
+          item.key === lineKey
+            ? {
+                ...item,
+                quantity: Math.min(
+                  Math.max(0, item.quantity + change),
+                  MAX_QUANTITY_PER_LINE,
+                ),
+              }
             : item,
         )
         .filter((item) => item.quantity > 0),
+    )
+  }
+
+  function removeProductFromCart(productId) {
+    setCartItems((currentItems) =>
+      currentItems.filter((item) => item.id !== productId),
     )
   }
 
@@ -615,7 +911,7 @@ if (checkoutOpen) {
                 message:
                   result.message ||
                   result.error ||
-                  `Server ne order reject kiya (${response.status}).`,
+                  `The store could not accept this order (${response.status}).`,
               }
             }
 
@@ -649,7 +945,8 @@ if (checkoutOpen) {
             console.error('Order request failed:', error)
             return {
               success: false,
-              message: 'Backend se connection nahi ho raha. Backend check karo.',
+              message:
+                'We could not reach the store server. Please try again.',
             }
           }
         }}
@@ -697,14 +994,15 @@ if (contactOpen) {
   return (
     <>
       <ProductDetail
+        key={selectedProduct.id}
         product={selectedProduct}
         onBack={() => setSelectedProduct(null)}
-        onAddToCart={(product) => {
-          addToCart(product)
+        onAddToCart={(product, options) => {
+          addToCart(product, options)
           setSelectedProduct(null)
         }}
-        onBuyNow={(product) => {
-          addToCart(product)
+        onBuyNow={(product, options) => {
+          addToCart(product, options)
           setSelectedProduct(null)
           setCartOpen(true)
         }}
@@ -745,6 +1043,13 @@ function submitSearch(value = searchQuery) {
     })
   }, 150)
 }
+
+const headerPhotoKey = headerUser
+  ? `${headerUser.id}|${
+      headerUser.hasCustomPhoto ? 'custom' : headerUser.profilePicture || ''
+    }`
+  : ''
+
   return (
     <div className="min-h-screen bg-[var(--page-bg)] text-[var(--page-fg)] transition-colors duration-300">
       {/* Announcement bar */}
@@ -768,32 +1073,20 @@ function submitSearch(value = searchQuery) {
 
           <nav className="hidden items-center gap-7 lg:flex">
             {navItems.map((item) => (
-             <a
-  key={item.label}
-  href={item.href}
-  onClick={(event) => {
-    event.preventDefault()
-    window.history.pushState(null, '', `#/${item.href.slice(1)}`)
-
-    setSelectedGroup(item.href.slice(1))
-    setSearchQuery('')
-    setSearchOpen(false)
-    setSearchFocused(false)
-    document.getElementById('product-grid')?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start',
-    })
-  }}
-  onMouseEnter={(event) => {
-  event.currentTarget.style.setProperty('color', '#DB7657', 'important')
-}}
-onMouseLeave={(event) => {
-  event.currentTarget.style.removeProperty('color')
-}}
-className="inline-flex items-center py-2 text-sm font-bold uppercase tracking-[0.15em] text-[var(--page-fg)] transition-colors duration-200 hover:text-[#db7657] md:text-base"
->
-  {item.label}
-</a>
+              <a
+                key={item.label}
+                href={item.href}
+                aria-current={
+                  selectedGroup === item.href.slice(1) ? 'true' : undefined
+                }
+                onClick={(event) => {
+                  event.preventDefault()
+                  selectGroup(item.href.slice(1))
+                }}
+                className="inline-flex items-center py-2 text-sm font-bold uppercase tracking-[0.15em] text-[var(--page-fg)] transition-colors duration-200 hover:text-[#db7657] aria-[current=true]:text-[#db7657] md:text-base"
+              >
+                {item.label}
+              </a>
             ))}
           </nav>
 
@@ -808,7 +1101,8 @@ className="inline-flex items-center py-2 text-sm font-bold uppercase tracking-[0
     aria-label="Open your profile"
     className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#db7657]"
   >
-    {(headerUser.hasCustomPhoto || headerUser.profilePicture) && !headerPhotoFailed ? (
+    {(headerUser.hasCustomPhoto || headerUser.profilePicture) &&
+    failedPhotoKey !== headerPhotoKey ? (
       <img
         src={
   headerUser.hasCustomPhoto
@@ -817,7 +1111,7 @@ className="inline-flex items-center py-2 text-sm font-bold uppercase tracking-[0
 }
         alt=""
         referrerPolicy="no-referrer"
-        onError={() => setHeaderPhotoFailed(true)}
+        onError={() => setFailedPhotoKey(headerPhotoKey)}
         className="h-9 w-9 rounded-full object-cover"
       />
     ) : (
@@ -833,6 +1127,21 @@ className="inline-flex items-center py-2 text-sm font-bold uppercase tracking-[0
     )}
   </button>
 )}
+
+            <button
+              type="button"
+              onClick={() => setWishlistOpen(true)}
+              aria-label={`Open wishlist (${favourites.length} items)`}
+              className="relative flex h-10 w-10 items-center justify-center transition-colors hover:text-brand"
+            >
+              <Heart size={19} strokeWidth={1.7} />
+
+              {favourites.length > 0 && (
+                <span className="absolute right-0 top-0 flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-brand px-1 text-[9px] font-bold text-white">
+                  {favourites.length}
+                </span>
+              )}
+            </button>
 
             <button
               type="button"
@@ -976,7 +1285,7 @@ className="inline-flex items-center py-2 text-sm font-bold uppercase tracking-[0
                   ))
                 ) : (
                   <p className="px-4 py-4 text-sm text-[var(--muted)]">
-                    Matching product nahi mila.
+                    No matching products.
                   </p>
                 )}
               </div>
@@ -1014,7 +1323,10 @@ className="inline-flex items-center py-2 text-sm font-bold uppercase tracking-[0
                   <a
                     key={item.label}
                     href={item.href}
-                    onClick={() => setMobileMenuOpen(false)}
+                    onClick={(event) => {
+                      event.preventDefault()
+                      selectGroup(item.href.slice(1))
+                    }}
                     className="border-b border-[var(--line)] py-4 text-xs font-semibold uppercase tracking-[0.15em] last:border-0"
                   >
                     {item.label}
@@ -1201,18 +1513,7 @@ className="inline-flex items-center py-2 text-sm font-bold uppercase tracking-[0
                 href={`#/${category.id}`}
 onClick={(event) => {
   event.preventDefault()
-  window.history.pushState(null, '', `#/${category.id}`)
-  setSelectedGroup(category.id)
-  setSearchQuery('')
-  setSearchOpen(false)
-  setSearchFocused(false)
-
-  window.setTimeout(() => {
-    document.getElementById('new-arrivals')?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start',
-    })
-  }, 100)
+  selectGroup(category.id)
 }}
                 initial={{ opacity: 0, y: 24 }}
                 whileInView={{ opacity: 1, y: 0 }}
@@ -1262,29 +1563,58 @@ onClick={(event) => {
             description="Fresh favourites, picked to make getting dressed feel easy."
           />
 
-          {visibleProducts.length > 0 ? (
-        <div
+          {productsLoading ? (
+            <div className="grid grid-cols-2 gap-x-4 gap-y-9 sm:gap-x-6 sm:gap-y-12 lg:grid-cols-4">
+              {Array.from({ length: 8 }, (_, index) => (
+                <div key={index} className="min-w-0">
+                  <div className="aspect-[4/5] animate-pulse rounded-sm bg-[#efede8] dark:bg-[#292824]" />
+                  <div className="mt-4 h-3 w-1/3 animate-pulse bg-[#efede8] dark:bg-[#292824]" />
+                  <div className="mt-2 h-3 w-2/3 animate-pulse bg-[#efede8] dark:bg-[#292824]" />
+                </div>
+              ))}
+            </div>
+          ) : visibleProducts.length > 0 ? (
+        <>
+        <motion.div
   id="product-grid"
+  key={`${selectedGroup || 'all'}-${currentPage}-${searchQuery}`}
+  initial={{ opacity: 0, y: 14 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ duration: 0.35, ease: 'easeOut' }}
   className="scroll-mt-28 grid grid-cols-2 gap-x-4 gap-y-9 sm:gap-x-6 sm:gap-y-12 lg:grid-cols-4"
 >
-    {visibleProducts.map((product) => (
-<ProductCard
-  key={product.id}
-  product={product}
-  onAdd={addToCart}
-  onView={(product) => setSelectedProduct(product)}
-  isFavourite={favourites.includes(product.id)}
-  onToggleFavourite={toggleFavourite}
-  quantity={cartItems.find((item) => item.id === product.id)?.quantity || 0}
-  onChangeQuantity={changeQuantity}
-  onRemove={(productId) => {
-    setCartItems((current) =>
-      current.filter((item) => item.id !== productId),
-    )
-  }}
-/>
-))}
-            </div>
+    {pagedProducts.map((product, index) => {
+      const productLines = cartItems.filter(
+        (item) => item.id === product.id,
+      )
+
+      return (
+        <ProductCard
+          key={product.id}
+          product={product}
+          index={index}
+          onAdd={handleCardAdd}
+          onView={(item) => setSelectedProduct(item)}
+          isFavourite={favourites.includes(product.id)}
+          onToggleFavourite={toggleFavourite}
+          cartLine={productLines[0]}
+          quantityTotal={productLines.reduce(
+            (total, item) => total + item.quantity,
+            0,
+          )}
+          onChangeQuantity={changeQuantity}
+          onRemove={removeProductFromCart}
+        />
+      )
+    })}
+            </motion.div>
+
+            <Pagination
+              page={currentPage}
+              pageCount={pageCount}
+              onChange={goToPage}
+            />
+        </>
           ) : (
             <p className="border border-[var(--line)] px-5 py-10 text-center text-sm text-[var(--muted)]">
               No products found. Try another search.
@@ -1358,18 +1688,16 @@ onClick={(event) => {
 
             <div className="mt-5 flex flex-col gap-3 text-xs text-[var(--muted)]">
               
-              <a className="hover:text-brand" href="#men">
-                Men
-              </a>
-              <a className="hover:text-brand" href="#women">
-                Women
-              </a>
-              <a className="hover:text-brand" href="#boys">
-               Boys 
-              </a>
-              <a className="hover:text-brand" href="#girls">
-               Girls
-              </a>
+              {navItems.map((item) => (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={() => selectGroup(item.href.slice(1))}
+                  className="w-fit text-left hover:text-brand"
+                >
+                  {item.label}
+                </button>
+              ))}
             </div>
           </div>
 <div>
@@ -1462,6 +1790,155 @@ onClick={(event) => {
   onOpenProduct={(product) => setSelectedProduct(product)}
 />
 
+      {/* Wishlist drawer */}
+      <AnimatePresence>
+        {wishlistOpen && (
+          <>
+            <motion.button
+              type="button"
+              aria-label="Close wishlist"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setWishlistOpen(false)}
+              className="fixed inset-0 z-50 cursor-default bg-black/50"
+            />
+
+            <motion.aside
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'tween', duration: 0.3 }}
+              className="fixed right-0 top-0 z-[51] flex h-full w-full max-w-md flex-col bg-[var(--surface)] shadow-2xl"
+              aria-label="Wishlist"
+              role="dialog"
+              aria-modal="true"
+            >
+              <div className="flex items-center justify-between border-b border-[var(--line)] px-5 py-5">
+                <div>
+                  <h2 className="font-display text-xl font-semibold">
+                    Wishlist{' '}
+                    <span className="text-[var(--muted)]">
+                      ({favourites.length})
+                    </span>
+                  </h2>
+
+                  <p className="mt-1 text-xs text-[var(--muted)]">
+                    Pieces you saved for later.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setWishlistOpen(false)}
+                  aria-label="Close wishlist"
+                  className="flex h-10 w-10 items-center justify-center"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {products.filter((product) => favourites.includes(product.id))
+                .length === 0 ? (
+                <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
+                  <Heart size={34} strokeWidth={1.2} className="text-brand" />
+
+                  <h3 className="mt-5 font-display text-xl font-semibold">
+                    Nothing saved yet.
+                  </h3>
+
+                  <p className="mt-2 text-sm text-[var(--muted)]">
+                    Tap the heart on any piece and it will show up here.
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={() => setWishlistOpen(false)}
+                    className="mt-6 bg-[#201f1c] px-6 py-3 text-[10px] font-bold uppercase tracking-[0.16em] text-white hover:bg-brand"
+                  >
+                    Keep exploring
+                  </button>
+                </div>
+              ) : (
+                <div className="flex-1 overflow-y-auto px-5">
+                  {products
+                    .filter((product) => favourites.includes(product.id))
+                    .map((product) => (
+                      <div
+                        key={product.id}
+                        className="flex gap-4 border-b border-[var(--line)] py-5"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setWishlistOpen(false)
+                            setSelectedProduct(product)
+                            window.scrollTo({ top: 0, behavior: 'smooth' })
+                          }}
+                          className="shrink-0"
+                          aria-label={`Open ${product.name}`}
+                        >
+                          {product.image ? (
+                            <img
+                              src={product.image}
+                              alt={product.name}
+                              loading="lazy"
+                              className="h-28 w-24 object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-28 w-24 items-center justify-center bg-[#ece8e1] text-center text-[9px] uppercase tracking-wide text-[var(--muted)] dark:bg-[#2b2925]">
+                              No image
+                            </div>
+                          )}
+                        </button>
+
+                        <div className="flex min-w-0 flex-1 flex-col">
+                          <p className="text-[9px] uppercase tracking-[0.12em] text-[var(--muted)]">
+                            {product.category}
+                          </p>
+
+                          <h3 className="mt-1 text-sm font-semibold">
+                            {product.name}
+                          </h3>
+
+                          <span className="mt-1 text-sm font-semibold">
+                            {formatPrice(product.price)}
+                          </span>
+
+                          <div className="mt-auto flex items-center gap-3 pt-3">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setWishlistOpen(false)
+                                setSelectedProduct(product)
+                                window.scrollTo({
+                                  top: 0,
+                                  behavior: 'smooth',
+                                })
+                              }}
+                              className="text-[10px] font-bold uppercase tracking-[0.14em] text-brand"
+                            >
+                              View piece
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => toggleFavourite(product.id)}
+                              className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--muted)] hover:text-brand"
+                            >
+                              <Trash2 size={13} /> Remove
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
+
       {/* Cart drawer */}
       <AnimatePresence>
         {cartOpen && (
@@ -1537,7 +2014,7 @@ onClick={(event) => {
                   <div className="flex-1 overflow-y-auto px-5">
                     {cartItems.map((item) => (
                       <div
-                        key={item.id}
+                        key={item.key}
                         className="flex gap-4 border-b border-[var(--line)] py-5"
                       >
                         {item.image ? (
@@ -1562,6 +2039,20 @@ onClick={(event) => {
                               <h3 className="mt-1 text-sm font-semibold">
                                 {item.name}
                               </h3>
+
+                              {(item.size ||
+                                (item.color && item.color !== 'As shown')) && (
+                                <p className="mt-1 text-xs text-[var(--muted)]">
+                                  {[
+                                    item.size ? `Size ${item.size}` : '',
+                                    item.color && item.color !== 'As shown'
+                                      ? item.color
+                                      : '',
+                                  ]
+                                    .filter(Boolean)
+                                    .join(' · ')}
+                                </p>
+                              )}
                             </div>
 
                             <button
@@ -1569,7 +2060,7 @@ onClick={(event) => {
                               onClick={() =>
                                 setCartItems((current) =>
                                   current.filter(
-                                    (product) => product.id !== item.id,
+                                    (product) => product.key !== item.key,
                                   ),
                                 )
                               }
@@ -1584,8 +2075,8 @@ onClick={(event) => {
                             <div className="flex items-center border border-[var(--line)]">
                               <button
                                 type="button"
-                                onClick={() => changeQuantity(item.id, -1)}
-                                aria-label="Decrease quantity"
+                                onClick={() => changeQuantity(item.key, -1)}
+                                aria-label={`Decrease quantity of ${item.name}`}
                                 className="p-2"
                               >
                                 <Minus size={13} />
@@ -1597,8 +2088,8 @@ onClick={(event) => {
 
                               <button
                                 type="button"
-                                onClick={() => changeQuantity(item.id, 1)}
-                                aria-label="Increase quantity"
+                                onClick={() => changeQuantity(item.key, 1)}
+                                aria-label={`Increase quantity of ${item.name}`}
                                 className="p-2"
                               >
                                 <Plus size={13} />
@@ -1662,7 +2153,10 @@ onClick={(event) => {
       exit={{ opacity: 0, y: 20 }}
       className="fixed bottom-5 left-1/2 z-[60] flex w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 flex-wrap items-center justify-center gap-x-4 gap-y-2 rounded-sm border border-[#db7657] bg-[#201f1c] px-6 py-5 text-center text-sm text-white shadow-xl sm:text-base"
     >
-      <span>{cartToast.productName} added to your bag</span>
+      <span>
+        {cartToast.productName}
+        {cartToast.size ? ` (Size ${cartToast.size})` : ''} added to your bag
+      </span>
 
       <a
         href="#cart"

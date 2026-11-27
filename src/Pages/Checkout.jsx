@@ -82,6 +82,8 @@ export default function Checkout({
           image: String(
             item.image || item.productImage || item.imageUrl || '',
           ),
+          size: item.size || '',
+          color: item.color || '',
           price: Number(item.price ?? item.unitPrice ?? 0),
           quantity: Math.max(1, Number(item.quantity) || 1),
         }
@@ -110,11 +112,11 @@ export default function Checkout({
       const result = await onPlaceOrder(order)
 
       if (result?.success === false) {
-        setError(result.message || 'Order place nahi ho saka.')
+        setError(result.message || 'We could not place this order.')
       }
     } catch (submitError) {
       console.error('Order submission error:', submitError)
-      setError('Order place nahi ho saka. Dobara try karein.')
+      setError('We could not place this order. Please try again.')
     } finally {
       setIsSubmitting(false)
     }
@@ -127,7 +129,7 @@ export default function Checkout({
           <h1 className="text-2xl font-semibold">Your bag is empty</h1>
 
           <p className="mt-3 text-sm text-[#77746d] dark:text-[#aaa69c]">
-            Checkout karne se pehle bag mein product add karein.
+            Add a piece to your bag before checking out.
           </p>
 
           <button
@@ -329,7 +331,7 @@ export default function Checkout({
             <div className="mt-4 divide-y divide-[#e2dfd7] dark:divide-[#3e3b34]">
               {cartItems.map((item) => (
                 <div
-                  key={item.id || item.productId || item.name}
+                  key={item.key || item.id || item.productId || item.name}
                   className="flex items-center gap-3 py-4"
                 >
                   {item.image ? (
@@ -351,6 +353,10 @@ export default function Checkout({
 
                     <p className="mt-1 text-xs text-[#77746d] dark:text-[#aaa69c]">
                       Qty: {item.quantity || 1}
+                      {item.size ? ` · Size ${item.size}` : ''}
+                      {item.color && item.color !== 'As shown'
+                        ? ` · ${item.color}`
+                        : ''}
                     </p>
                   </div>
 

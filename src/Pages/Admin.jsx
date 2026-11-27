@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { motion } from 'framer-motion'
 import { XCircle } from 'lucide-react'
 import { API_BASE } from '../config'
 import {
@@ -9,10 +10,9 @@ import {
   Clock3,
   CreditCard,
   MapPin,
+  MessageSquare,
   Package,
   PackageCheck,
-  ShoppingBag,
-  SlidersHorizontal,
   Truck,
   UserRound,
 } from 'lucide-react'
@@ -34,6 +34,9 @@ const statusColors = {
 }
 
 const money = (value) => `Rs. ${Number(value || 0).toLocaleString()}`
+const ORDERS_PER_PAGE = 20
+const countStatus = (orders, status) =>
+  orders.filter((order) => order.orderStatus === status).length
 
 function OrderCard({ order, onUpdated, onDeleted }) {
   const [status, setStatus] = useState(order.orderStatus)
@@ -60,21 +63,21 @@ function OrderCard({ order, onUpdated, onDeleted }) {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.message || 'Status update nahi hua.')
+        throw new Error(data.message || 'Status could not be updated.')
       }
 
       onUpdated(data.order)
       setMessage('Status saved successfully.')
     } catch (error) {
       setFailed(true)
-      setMessage(error.message || 'Status update nahi hua.')
+      setMessage(error.message || 'Status could not be updated.')
     } finally {
       setSaving(false)
     }
   }
   async function deleteOrder() {
     const confirmed = window.confirm(
-      'Kya aap ye order permanently delete karna chahte hain? Ye action undo nahi hoga.',
+      'Delete this order permanently? This cannot be undone.',
     )
 
     if (!confirmed) return
@@ -100,13 +103,13 @@ function OrderCard({ order, onUpdated, onDeleted }) {
       }
 
       if (!response.ok) {
-        throw new Error(data.message || 'Order delete nahi hua.')
+        throw new Error(data.message || 'Order could not be deleted.')
       }
 
       onDeleted(order._id)
     } catch (error) {
       setFailed(true)
-      setMessage(error.message || 'Order delete nahi hua.')
+      setMessage(error.message || 'Order could not be deleted.')
     } finally {
       setSaving(false)
     }
@@ -200,6 +203,16 @@ function OrderCard({ order, onUpdated, onDeleted }) {
               >
                 <span className="min-w-0 break-words">
                   {item.name} × {item.quantity}
+                  {(item.size || (item.color && item.color !== 'As shown')) && (
+                    <span className="block text-xs text-[#8b837c]">
+                      {[
+                        item.size ? `Size ${item.size}` : '',
+                        item.color && item.color !== 'As shown' ? item.color : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </span>
+                  )}
                 </span>
                 <span className="shrink-0 font-semibold">
                   {money(item.price * item.quantity)}
@@ -284,13 +297,13 @@ function MessagesSection() {
           signal: controller.signal,
         })
 
-        if (!response.ok) throw new Error('Messages load nahi hue.')
+        if (!response.ok) throw new Error('Messages could not be loaded.')
 
         const data = await response.json()
         setMessages(data.messages || [])
       } catch (err) {
         if (err.name !== 'AbortError') {
-          setError(err.message || 'Messages load nahi hue.')
+          setError(err.message || 'Messages could not be loaded.')
         }
       } finally {
         if (!controller.signal.aborted) setLoading(false)
@@ -312,12 +325,12 @@ function MessagesSection() {
         current.map((m) => (m._id === id ? { ...m, isRead: true } : m)),
       )
     } catch {
-      setError('Status update nahi hua.')
+      setError('Status could not be updated.')
     }
   }
 
   async function removeMessage(id) {
-    if (!window.confirm('Ye message permanently delete karna hai?')) return
+    if (!window.confirm('Delete this message permanently?')) return
 
     try {
       const response = await fetch(
@@ -325,11 +338,11 @@ function MessagesSection() {
         { method: 'DELETE', credentials: 'include' },
       )
       if (!response.ok && response.status !== 404) {
-        throw new Error('Message delete nahi hua.')
+        throw new Error('Message could not be deleted.')
       }
       setMessages((current) => current.filter((m) => m._id !== id))
     } catch (err) {
-      setError(err.message || 'Message delete nahi hua.')
+      setError(err.message || 'Message could not be deleted.')
     }
   }
 
@@ -361,7 +374,7 @@ function MessagesSection() {
 
       {!loading && messages.length === 0 && !error && (
         <div className="mt-5 rounded-[24px] border border-[#e9e5e0] bg-white px-6 py-10 text-center text-sm text-[#928b85]">
-          Abhi koi message nahi hai.
+          No customer messages yet.
         </div>
       )}
 
@@ -500,13 +513,13 @@ function AddProductForm({ groups, labelFor, onCreated, onClose }) {
       const data = await response.json().catch(() => ({}))
 
       if (!response.ok) {
-        throw new Error(data.message || 'Product nahi bana.')
+        throw new Error(data.message || 'Product could not be created.')
       }
 
       onCreated(data.product)
       onClose()
     } catch (err) {
-      setError(err.message || 'Product nahi bana.')
+      setError(err.message || 'Product could not be created.')
       setSaving(false)
     }
   }
@@ -703,7 +716,7 @@ function ProductRow({ product, onUpdated }) {
       const data = await response.json().catch(() => ({}))
 
       if (!response.ok) {
-        throw new Error(data.message || 'Product update nahi hua.')
+        throw new Error(data.message || 'Product could not be updated.')
       }
 
       onUpdated(data.product)
@@ -711,7 +724,7 @@ function ProductRow({ product, onUpdated }) {
       setMessage('Saved.')
     } catch (error) {
       setFailed(true)
-      setMessage(error.message || 'Product update nahi hua.')
+      setMessage(error.message || 'Product could not be updated.')
     } finally {
       setSaving(false)
     }
@@ -875,7 +888,7 @@ function ProductRow({ product, onUpdated }) {
 
           <div>
             <label htmlFor={`oldprice-${product._id}`} className={labelClass}>
-              Old price (khali = koi discount nahi)
+              Old price (leave empty for no discount)
             </label>
             <input
               id={`oldprice-${product._id}`}
@@ -976,23 +989,26 @@ function ProductsSection() {
 
         if (response.status === 401) {
           throw new Error(
-            'Admin account se sign in karein, phir yahan wapas aayein.',
+            'Please sign in with an admin account, then open this page again.',
           )
         }
 
         if (response.status === 403) {
-          throw new Error('Is account ko admin access nahi hai.')
+          throw new Error('This account does not have admin access.')
         }
 
         if (!response.ok) {
-          throw new Error('Products load nahi hue. Dobara try karein.')
+          throw new Error('Products could not be loaded. Please try again.')
         }
 
         const data = await response.json()
         setProducts(data.products || [])
       } catch (err) {
         if (err.name !== 'AbortError') {
-          setError(err.message || 'Backend se connection nahi ho raha.')
+          setError(
+            err.message ||
+              'Could not reach the API. Check the backend and try again.',
+          )
         }
       } finally {
         if (!controller.signal.aborted) setLoading(false)
@@ -1064,13 +1080,13 @@ function ProductsSection() {
         Products
       </h2>
       <p className="mt-3 text-sm leading-6 text-[#827b75]">
-        Price, stock aur visibility yahan se badlein. Hide karne se product
-        delete nahi hota, sirf chhup jata hai.
+        Update price, stock and visibility here. Hiding a product keeps it in
+        the database; it just stops showing on the store.
       </p>
 
       {loading && (
         <div className="mt-6 rounded-2xl border border-[#e8e3de] bg-white p-8 text-sm text-[#77706a]">
-          Products load ho rahe hain...
+          Loading products...
         </div>
       )}
 
@@ -1159,8 +1175,7 @@ function ProductsSection() {
           )}
 
           <p className="mt-4 text-xs text-[#928b85]">
-            {visible.length} products dikh rahe hain. Naya product list ke
-            shuru mein dikhta hai, page reload par aakhir mein chala jata hai.
+            Showing {visible.length} product{visible.length === 1 ? '' : 's'}.
           </p>
 
           {visible.length === 0 ? (
@@ -1168,7 +1183,7 @@ function ProductsSection() {
               <Package size={32} className="mx-auto text-[#c7bdb5]" />
               <p className="mt-4 font-semibold">No products found</p>
               <p className="mt-1 text-sm text-[#928b85]">
-                Search ya filter badal kar dekhein.
+                Try a different search or filter.
               </p>
             </div>
           ) : (
@@ -1190,9 +1205,16 @@ function ProductsSection() {
 
 export default function Admin() {
   const [orders, setOrders] = useState([])
+  const [total, setTotal] = useState(0)
+  const [pageCount, setPageCount] = useState(1)
+  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [filter, setFilter] = useState('all')
+  const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch] = useState('')
+  const [reloadToken, setReloadToken] = useState(0)
+  const [lastUpdated, setLastUpdated] = useState(null)
   const [tab, setTab] = useState('orders')
 
   useEffect(() => {
@@ -1200,8 +1222,16 @@ export default function Admin() {
 
     async function loadOrders() {
       try {
+        const params = new URLSearchParams({
+          page: String(page),
+          limit: String(ORDERS_PER_PAGE),
+        })
+
+        if (filter !== 'all') params.set('status', filter)
+        if (search) params.set('q', search)
+
         const response = await fetch(
-          API_BASE + '/api/admin/orders',
+          `${API_BASE}/api/admin/orders?${params.toString()}`,
           {
             credentials: 'include',
             signal: controller.signal,
@@ -1210,24 +1240,36 @@ export default function Admin() {
 
         if (response.status === 401) {
           throw new Error(
-            'Admin account se sign in karein, phir yahan wapas aayein.',
+            'Please sign in with an admin account in the store, then open this page again.',
           )
         }
 
         if (response.status === 403) {
-          throw new Error('Is account ko admin access nahi hai.')
+          throw new Error('This account does not have admin access.')
         }
 
         if (!response.ok) {
-          throw new Error('Orders load nahi hue. Dobara try karein.')
+          throw new Error('Orders could not be loaded. Please try again.')
         }
 
         const data = await response.json()
-        setOrders(data.orders)
+        const nextOrders = Array.isArray(data.orders) ? data.orders : []
+        const nextPageCount = Math.max(1, Number(data.pageCount) || 1)
+
+        setOrders(nextOrders)
+        setTotal(Number(data.total) || 0)
+        setPageCount(nextPageCount)
+        setLastUpdated(new Date())
+
+        if (page > nextPageCount) setPage(nextPageCount)
       } catch (err) {
-        if (err.name !== 'AbortError') {
-          setError(err.message || 'Backend se connection nahi ho raha.')
-        }
+        if (err.name === 'AbortError') return
+
+        setError(
+          err instanceof TypeError
+            ? 'Could not reach the API. Check that the backend is running and allows this origin.'
+            : err.message || 'Orders could not be loaded.',
+        )
       } finally {
         if (!controller.signal.aborted) setLoading(false)
       }
@@ -1235,7 +1277,7 @@ export default function Admin() {
 
     loadOrders()
     return () => controller.abort()
-  }, [])
+  }, [page, filter, search, reloadToken])
 
   function updateOrder(updatedOrder) {
     setOrders((current) =>
@@ -1245,44 +1287,69 @@ export default function Admin() {
     )
   }
 
-    function removeOrder(orderId) {
+  function removeOrder(orderId) {
     setOrders((current) => current.filter((order) => order._id !== orderId))
+    setTotal((current) => Math.max(0, current - 1))
   }
 
-  const visibleOrders =
-    filter === 'all'
-      ? orders
-      : orders.filter((order) => order.orderStatus === filter)
+  function applyFilter(nextFilter) {
+    setFilter(nextFilter)
+    setPage(1)
+    setError('')
+  }
+
+  function submitSearch(event) {
+    event.preventDefault()
+    setSearch(searchInput.trim())
+    setPage(1)
+    setError('')
+  }
+
+  function clearSearch() {
+    setSearchInput('')
+    setSearch('')
+    setPage(1)
+    setError('')
+  }
+
+  function refreshOrders() {
+    setError('')
+    setReloadToken((token) => token + 1)
+  }
 
   const summary = [
     {
-      label: 'Total orders',
-      value: orders.length,
+      label: 'All orders',
+      value: total,
+      filter: 'all',
       icon: ClipboardList,
       iconClass: 'bg-[#fff0e9] text-[#d46d4f]',
     },
     {
       label: 'Processing',
-      value: orders.filter((order) => order.orderStatus === 'processing').length,
+      value: countStatus(orders, 'processing'),
+      filter: 'processing',
       icon: Clock3,
       iconClass: 'bg-amber-50 text-amber-700',
     },
     {
       label: 'Shipped',
-      value: orders.filter((order) => order.orderStatus === 'shipped').length,
+      value: countStatus(orders, 'shipped'),
+      filter: 'shipped',
       icon: Truck,
       iconClass: 'bg-violet-50 text-violet-700',
     },
     {
       label: 'Delivered',
-      value: orders.filter((order) => order.orderStatus === 'delivered').length,
+      value: countStatus(orders, 'delivered'),
+      filter: 'delivered',
       icon: CheckCircle2,
       iconClass: 'bg-emerald-50 text-emerald-700',
-
     },
-      {
+    {
       label: 'Cancelled',
-      value: orders.filter((order) => order.orderStatus === 'cancelled').length,
+      value: countStatus(orders, 'cancelled'),
+      filter: 'cancelled',
       icon: XCircle,
       iconClass: 'bg-red-50 text-red-700',
     },
@@ -1290,61 +1357,110 @@ export default function Admin() {
 
   return (
     <main className="min-h-screen bg-[#f5f3f0] text-[#24211f]">
-      {/* Top bar */}
-      <header className="border-b border-[#e8e3de] bg-white">
-        <div className="mx-auto flex max-w-[1500px] flex-wrap items-center justify-between gap-4 px-5 py-5 sm:px-8 lg:px-12">
-          <div className="flex items-center gap-3">
-       <div className="h-[60px] w-[60px] shrink-0 overflow-hidden rounded-[20px]">
-  <img
-    src="/urban.jpg"
-    alt="Urban Outline logo"
-    className="block h-full w-full object-cover"
-  />
-</div>
-            <div>
-              <p className="text-sm font-bold tracking-[0.14em]">
-                URBAN OUTLINE
-              </p>
-              <p className="mt-0.5 text-xs text-[#928b85]">Admin dashboard</p>
+      <div className="lg:flex">
+        {/* Sidebar */}
+        <aside className="sticky top-0 z-40 border-b border-white/10 bg-[#201f1c] text-white lg:flex lg:h-screen lg:w-[272px] lg:shrink-0 lg:flex-col lg:border-b-0 lg:border-r lg:border-black/20">
+          <div className="flex items-center justify-between gap-3 px-4 py-4 sm:px-6 lg:flex-col lg:items-stretch lg:gap-0 lg:px-6 lg:py-7">
+            <div className="flex items-center gap-3">
+              <div className="h-11 w-11 shrink-0 overflow-hidden rounded-2xl ring-1 ring-white/15 lg:h-12 lg:w-12">
+                <img
+                  src="/urban.jpg"
+                  alt="Urban Outline logo"
+                  className="block h-full w-full object-cover"
+                />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[13px] font-bold tracking-[0.16em]">
+                  URBAN OUTLINE
+                </p>
+                <p className="mt-0.5 text-[11px] text-white/45">
+                  Admin dashboard
+                </p>
+              </div>
             </div>
+
+            <a
+              href="/"
+              className="inline-flex items-center gap-2 rounded-full border border-white/15 px-3 py-2 text-xs font-semibold text-white/75 transition hover:border-white/40 hover:text-white lg:hidden"
+            >
+              <ArrowLeft size={15} />
+              Store
+            </a>
           </div>
 
-          <a
-            href="/"
-            className="inline-flex items-center gap-2 rounded-xl border border-[#e8e3de] px-4 py-3 text-sm font-semibold transition hover:bg-[#f7f5f2]"
+          <nav
+            aria-label="Admin sections"
+            className="flex gap-2 overflow-x-auto px-4 pb-4 sm:px-6 lg:mt-7 lg:flex-col lg:gap-1.5 lg:overflow-visible lg:px-4 lg:pb-0"
           >
-            <ArrowLeft size={17} />
-            Back to store
-          </a>
-        </div>
-      </header>
+            {[
+              { id: 'orders', label: 'Orders', icon: ClipboardList },
+              { id: 'products', label: 'Products & stock', icon: Package },
+              { id: 'messages', label: 'Messages', icon: MessageSquare },
+            ].map(({ id, label, icon: Icon }) => {
+              const active = tab === id
 
-      <div className="mx-auto max-w-[1500px] px-5 py-8 sm:px-8 lg:px-12 lg:py-12">
-        {/* Section tabs */}
-        <div className="mb-8 flex flex-wrap gap-2">
-          {[
-            { id: 'orders', label: 'Orders' },
-            { id: 'products', label: 'Products & stock' },
-            { id: 'messages', label: 'Messages' },
-          ].map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setTab(item.id)}
-              aria-pressed={tab === item.id}
-              className={
-                'rounded-full border px-5 py-2 text-sm font-bold transition ' +
-                (tab === item.id
-                  ? 'border-[#24211f] bg-[#24211f] text-white'
-                  : 'border-[#e8e3de] bg-white text-[#77706a] hover:border-[#db7657]')
-              }
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setTab(id)}
+                  aria-pressed={active}
+                  className={`group relative flex shrink-0 items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-colors lg:w-full ${
+                    active ? 'text-white' : 'text-white/55 hover:text-white'
+                  }`}
+                >
+                  {active && (
+                    <motion.span
+                      layoutId="admin-nav-pill"
+                      className="absolute inset-0 rounded-xl bg-[#db7657]"
+                      transition={{
+                        type: 'spring',
+                        stiffness: 430,
+                        damping: 34,
+                      }}
+                    />
+                  )}
+
+                  <span className="absolute inset-0 rounded-xl bg-white/0 transition-colors group-hover:bg-white/5" />
+
+                  <Icon
+                    size={17}
+                    strokeWidth={1.9}
+                    className="relative z-10"
+                  />
+                  <span className="relative z-10 whitespace-nowrap">
+                    {label}
+                  </span>
+                </button>
+              )
+            })}
+          </nav>
+
+          <div className="mt-auto hidden px-6 pb-7 lg:block">
+            <a
+              href="/"
+              className="inline-flex items-center gap-2 text-xs font-semibold text-white/60 transition hover:text-white"
             >
-              {item.label}
-            </button>
-          ))}
-        </div>
+              <ArrowLeft size={15} />
+              Back to store
+            </a>
+            <p className="mt-5 text-[11px] leading-5 text-white/35">
+              Signed in as an admin. New customer orders show up here — press
+              Refresh to pull the latest.
+            </p>
+          </div>
+        </aside>
 
-        <div className={tab === 'orders' ? '' : 'hidden'}>
+        {/* Content */}
+        <div className="min-w-0 flex-1">
+          <motion.div
+            key={tab}
+            initial={{ y: 10 }}
+            animate={{ y: 0 }}
+            transition={{ duration: 0.26, ease: 'easeOut' }}
+            className="mx-auto max-w-[1500px] px-5 py-8 sm:px-8 lg:px-12 lg:py-12"
+          >
+        {tab === 'orders' && (<>
         {/* Page title */}
         <div className="mb-9 flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -1355,7 +1471,8 @@ export default function Admin() {
               Orders
             </h1>
             <p className="mt-3 text-sm leading-6 text-[#827b75] sm:text-base">
-              View and manage your latest 50 orders in one place.
+              Every order that comes through the store, with search, filters and
+              status updates.
             </p>
           </div>
 <button
@@ -1376,7 +1493,7 @@ export default function Admin() {
         {loading && (
             
           <div className="rounded-2xl border border-[#e8e3de] bg-white p-8 text-sm text-[#77706a]">
-            Orders load ho rahe hain...
+            Loading orders...
           </div>
         )}
 
@@ -1386,9 +1503,19 @@ export default function Admin() {
             className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700"
           >
             <p>{error}</p>
-            <a href="/" className="mt-3 inline-block font-bold underline">
-              Store par jaakar sign in karein
-            </a>
+            <div className="mt-3 flex flex-wrap items-center gap-4">
+              <button
+                type="button"
+                onClick={refreshOrders}
+                className="rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-bold text-red-700 transition hover:bg-red-100"
+              >
+                Try again
+              </button>
+
+              <a href="/" className="font-bold underline">
+                Sign in on the store
+              </a>
+            </div>
           </div>
         )}
 
@@ -1396,15 +1523,12 @@ export default function Admin() {
           <>
             {/* Summary */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-            {summary.map(({ label, value, icon: Icon, iconClass }) => {
-  const cardFilter =
-    label === 'Total orders' ? 'all' : label.toLowerCase()
-
+            {summary.map(({ label, value, filter: cardFilter, icon: Icon, iconClass }) => {
   return (
     <button
       type="button"
       key={label}
-      onClick={() => setFilter(cardFilter)}
+      onClick={() => applyFilter(cardFilter)}
       aria-pressed={filter === cardFilter}
       className={`rounded-[24px] border border-[#db7657] bg-white p-6 text-left shadow-[0_8px_30px_rgba(40,32,25,0.04)] transition hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#db7657] ${
         filter === cardFilter ? 'ring-2 ring-[#db7657]/30' : ''
@@ -1427,28 +1551,79 @@ export default function Admin() {
             </div>
 
             <p className="mt-3 text-xs text-[#928b85]">
-              Summary counts are based on the latest 50 loaded orders.
+              “All orders” counts every order that matches the current search and
+              filter. The status cards count the orders on this page.
             </p>
 
             {/* List heading and filter */}
           
             
             <div
-  id="orders-list"
-  className="mb-5 mt-12 scroll-mt-6 flex flex-wrap items-end justify-between gap-5"
-></div>
+              id="orders-list"
+              className="mb-5 mt-12 flex scroll-mt-6 flex-wrap items-end justify-between gap-4"
+            >
+              <form
+                onSubmit={submitSearch}
+                className="flex flex-wrap items-end gap-2"
+              >
+                <label className="block text-xs font-bold text-[#827b75]">
+                  Search orders
+                  <input
+                    value={searchInput}
+                    onChange={(event) => setSearchInput(event.target.value)}
+                    placeholder="Order ID, name, phone, city or product"
+                    className="mt-1 block w-full min-w-[240px] rounded-lg border border-[#ded8d2] bg-white px-3 py-2 text-sm font-normal text-[#24211f] outline-none focus:border-[#db7657] sm:w-[320px]"
+                  />
+                </label>
 
-            {visibleOrders.length === 0 ? (
+                <button
+                  type="submit"
+                  className="rounded-lg bg-[#24211f] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#db7657]"
+                >
+                  Search
+                </button>
+
+                {(search || searchInput) && (
+                  <button
+                    type="button"
+                    onClick={clearSearch}
+                    className="rounded-lg border border-[#ded8d2] bg-white px-4 py-2 text-sm font-semibold text-[#706a65] transition hover:border-[#db7657] hover:text-[#db7657]"
+                  >
+                    Clear
+                  </button>
+                )}
+              </form>
+
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-[#928b85]">
+                  {lastUpdated
+                    ? `Updated ${lastUpdated.toLocaleTimeString()}`
+                    : ''}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={refreshOrders}
+                  className="inline-flex items-center gap-2 rounded-lg border border-[#ded8d2] bg-white px-4 py-2 text-sm font-semibold text-[#706a65] transition hover:border-[#db7657] hover:text-[#db7657]"
+                >
+                  Refresh
+                </button>
+              </div>
+            </div>
+
+            {orders.length === 0 ? (
               <div className="rounded-[24px] border border-[#e9e5e0] bg-white px-6 py-14 text-center">
                 <Package size={32} className="mx-auto text-[#c7bdb5]" />
                 <p className="mt-4 font-semibold">No orders found</p>
                 <p className="mt-1 text-sm text-[#928b85]">
-                  Is filter mein koi order nahi hai.
+                  {search || filter !== 'all'
+                    ? 'No orders match this search or filter.'
+                    : 'Orders will appear here as soon as customers check out.'}
                 </p>
               </div>
             ) : (
               <div className="space-y-5">
-                {visibleOrders.map((order) => (
+                {orders.map((order) => (
                   <OrderCard
                     key={order._id}
                     order={order}
@@ -1456,18 +1631,48 @@ export default function Admin() {
                     onDeleted={removeOrder}
                   />
                 ))}
-                          </div>
+              </div>
+            )}
+
+            {pageCount > 1 && (
+              <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#e8e3de] bg-white px-4 py-3">
+                <p className="text-xs text-[#827b75]">
+                  Page {page} of {pageCount} · {total} order
+                  {total === 1 ? '' : 's'}
+                </p>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPage((current) => Math.max(1, current - 1))}
+                    disabled={page === 1}
+                    className="rounded-lg border border-[#ded8d2] bg-white px-4 py-2 text-sm font-semibold text-[#706a65] transition hover:border-[#db7657] hover:text-[#db7657] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Previous
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPage((current) => Math.min(pageCount, current + 1))
+                    }
+                    disabled={page >= pageCount}
+                    className="rounded-lg border border-[#ded8d2] bg-white px-4 py-2 text-sm font-semibold text-[#706a65] transition hover:border-[#db7657] hover:text-[#db7657] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
             )}
           </>
         )}
+        </>)}
 
-        </div>
-
-        <div className={tab === 'messages' ? '' : 'hidden'}>
-          {!loading && !error && <MessagesSection />}
-        </div>
+        {tab === 'messages' && !loading && !error && <MessagesSection />}
 
         {tab === 'products' && <ProductsSection />}
+          </motion.div>
+        </div>
       </div>
     </main>
   )

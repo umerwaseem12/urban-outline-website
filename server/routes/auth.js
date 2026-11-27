@@ -60,7 +60,7 @@ async function sendVerificationEmail(user) {
   user.verifyTokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000)
   await user.save()
 
-  const frontendUrl = process.env.CLIENT_ORIGIN || 'http://localhost:5173'
+  const frontendUrl = primaryOrigin()
   const verifyUrl = `${frontendUrl}/?verifyToken=${token}`
 
   const transporter = nodemailer.createTransport({
@@ -81,11 +81,10 @@ async function sendVerificationEmail(user) {
   })
 }
 
-function validOrigin(req, res, next) {
-  const allowedOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173'
-  const origin = req.get('Origin')
+const { isAllowedOrigin, primaryOrigin } = require('../lib/origins')
 
-  if (origin !== allowedOrigin) {
+function validOrigin(req, res, next) {
+  if (!isAllowedOrigin(req)) {
     return res.status(403).json({
       success: false,
       message: 'Request origin is not allowed.',
@@ -444,7 +443,7 @@ router.post('/photo', validOrigin, authLimiter, async (req, res) => {
         console.error('Photo upload failed:', error.message)
         return res.status(400).json({
           success: false,
-          message: 'Photo upload nahi hui. Valid image try karein.',
+          message: 'Upload failed. Please choose a valid image.',
         })
       }
     })
@@ -452,7 +451,7 @@ router.post('/photo', validOrigin, authLimiter, async (req, res) => {
     console.error('Photo auth check failed:', error.message)
     return res.status(500).json({
       success: false,
-      message: 'Photo upload abhi available nahi hai.',
+      message: 'Photo upload is not available right now.',
     })
   }
 })
@@ -523,7 +522,7 @@ router.patch('/profile', validOrigin, authLimiter, async (req, res) => {
     console.error('Profile update failed:', error.message)
     return res.status(500).json({
       success: false,
-      message: 'Profile update nahi hui. Please try again.',
+      message: 'We could not update your profile. Please try again.',
     })
   }
 })
@@ -642,8 +641,7 @@ router.post('/forgot-password', validOrigin, resetRequestLimiter, async (req, re
       user.resetTokenExpiresAt = new Date(Date.now() + 15 * 60 * 1000)
       await user.save()
 
-      const frontendUrl =
-        process.env.CLIENT_ORIGIN || 'http://localhost:5173'
+      const frontendUrl = primaryOrigin()
 
       const resetUrl = `${frontendUrl}/?resetToken=${token}`
 
@@ -752,7 +750,7 @@ router.post('/check-reset-link', validOrigin, resetCheckLimiter, async (req, res
     return res.json({ success: true })
   } catch (error) {
     console.error('Reset link check failed:', error.message)
-    return res.status(500).json({ message: 'Link check nahi ho saka. Dobara try karein.' })
+    return res.status(500).json({ message: 'We could not verify this link. Please try again.' })
   }
 })
 

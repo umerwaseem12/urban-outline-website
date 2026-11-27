@@ -34,16 +34,16 @@ export default function Contact({ onBack }) {
 
       if (!response.ok) {
         setStatus('error')
-        setFeedback(result.message || 'Message send nahi ho saka.')
+        setFeedback(result.message || 'We could not send your message.')
         return
       }
 
       form.reset()
       setStatus('sent')
-      setFeedback(result.message || 'Aap ka message mil gaya hai.')
+      setFeedback(result.message || 'Thanks, your message has reached us.')
     } catch {
       setStatus('error')
-      setFeedback('Backend se connection nahi ho raha. Thori der baad try karein.')
+      setFeedback('Could not reach the server. Please try again shortly.')
     }
   }
 
@@ -70,8 +70,8 @@ export default function Contact({ onBack }) {
             </p>
             <h1 className="mt-3 text-3xl font-semibold">Contact us</h1>
             <p className="mt-4 max-w-md text-sm leading-6 text-[#77746d] dark:text-[#aaa69c]">
-              Product, order, delivery ya returns ke baare mein sawal ho to
-              neeche form fill karein.
+              Have a question about a product, an order, delivery or returns?
+              Fill in the form below.
             </p>
           </section>
 

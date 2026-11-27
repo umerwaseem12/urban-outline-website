@@ -63,7 +63,7 @@ export default function PasswordReset({
     setMessage('')
 
     if (token && password !== confirmPassword) {
-      setError('Passwords match nahi karte.')
+      setError('Passwords do not match.')
       return
     }
 
@@ -96,7 +96,7 @@ export default function PasswordReset({
       setMessage(data.message)
       setCompleted(true)
     } catch (err) {
-      setError(err.message || 'Server se connection nahi ho raha.')
+      setError(err.message || 'Could not reach the server.')
     } finally {
       setBusy(false)
     }
@@ -135,7 +135,7 @@ export default function PasswordReset({
 
         {token && linkStatus === 'error' && (
           <p role="alert" className="mt-6 text-sm text-red-700">
-            Link check nahi ho saka. Backend check karke dobara try karein.
+            We could not verify this link. Please try again.
           </p>
         )}
 
@@ -212,7 +212,7 @@ export default function PasswordReset({
         {!token && (
           <p className="mt-4 text-xs leading-5 text-[#827b75]">
             Google-only accounts ka password Google se manage hota hai.
-            Email na mile to spam folder bhi check karein.
+            If you cannot find the email, please check your spam folder.
           </p>
         )}
 

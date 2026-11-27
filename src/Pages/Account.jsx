@@ -6,35 +6,19 @@ import ProfileDashboard from './ProfileDashboard.jsx'
 import { API_BASE } from '../config'
 
 import { GoogleLogin, GoogleOAuthProvider } from '@react-oauth/google'
+
+// Public OAuth client ID. It is safe to ship in the bundle (it is public by
+// design) and keeps the Google button visible when no .env file is present.
+// Set VITE_GOOGLE_CLIENT_ID to override it.
+const GOOGLE_CLIENT_ID =
+  import.meta.env.VITE_GOOGLE_CLIENT_ID ||
+  '304005390868-2e3o6jv3db69gmlgrp3lf6joq1h8ji8e.apps.googleusercontent.com'
 const isValidEmail = (value) =>
   typeof value === 'string' &&
   value.trim().length <= 254 &&
   /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value.trim())
 const inputClass =
   'w-full rounded-xl border border-[#e5e2de] bg-white px-4 py-2.5 text-sm text-[#24211f] outline-none transition-all duration-200 placeholder:text-[#aaa49e] focus:border-[#db7657] focus:ring-4 focus:ring-[#db7657]/10'
-
-function GoogleIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">
-      <path
-        fill="#EA4335"
-        d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
-      />
-      <path
-        fill="#4285F4"
-        d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.34 7.09-17.65z"
-      />
-      <path
-        fill="#FBBC05"
-        d="M10.53 28.59A14.4 14.4 0 0 1 9.75 24c0-1.6.28-3.14.77-4.59l-7.98-6.19A23.9 23.9 0 0 0 0 24c0 3.87.93 7.51 2.56 10.78l7.97-6.19z"
-      />
-      <path
-        fill="#34A853"
-        d="M24 48c6.48 0 11.92-2.13 15.89-5.8l-7.73-6c-2.14 1.44-4.89 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.97 6.19C6.51 42.62 14.62 48 24 48z"
-      />
-    </svg>
-  )
-}
 
 export default function Account({ onBack, isDark, onToggleTheme, onHelp }) {
   const reduceMotion = useReducedMotion()
@@ -51,7 +35,6 @@ export default function Account({ onBack, isDark, onToggleTheme, onHelp }) {
   const [feedback, setFeedback] = useState(null)
   const [user, setUser] = useState(null)
   const [photoFailed, setPhotoFailed] = useState(false)
-  const [profileView, setProfileView] = useState('profile')
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [photoVersion, setPhotoVersion] = useState(0)
   const [unverifiedEmail, setUnverifiedEmail] = useState('')
@@ -145,7 +128,7 @@ export default function Account({ onBack, isDark, onToggleTheme, onHelp }) {
     if (mode === 'signup' && password !== confirmPassword) {
       setFeedback({
         type: 'error',
-        text: 'Passwords match nahi karte. Dobara check karein.',
+        text: 'Passwords do not match. Please check and try again.',
       })
       return
     }
@@ -207,7 +190,7 @@ export default function Account({ onBack, isDark, onToggleTheme, onHelp }) {
       console.error('Authentication failed:', error)
       setFeedback({
         type: 'error',
-        text: 'Server se connection nahi ho raha. Backend check karein.',
+        text: 'Could not reach the server. Please try again.',
       })
     }
   }
@@ -236,12 +219,12 @@ export default function Account({ onBack, isDark, onToggleTheme, onHelp }) {
           result.message ||
           (response.ok
             ? 'A new verification link has been sent to your email.'
-            : 'Link bhejna nahi ho saka. Dobara try karein.'),
+            : 'We could not send the link. Please try again.'),
       })
     } catch {
       setFeedback({
         type: 'error',
-        text: 'Server se connection nahi ho raha. Backend check karein.',
+        text: 'Could not reach the server. Please try again.',
       })
     } finally {
       setResending(false)
@@ -277,7 +260,7 @@ export default function Account({ onBack, isDark, onToggleTheme, onHelp }) {
     } catch {
       setFeedback({
         type: 'error',
-        text: 'Server se connection nahi ho raha. Backend check karein.',
+        text: 'Could not reach the server. Please try again.',
       })
     }
   }
@@ -319,7 +302,7 @@ export default function Account({ onBack, isDark, onToggleTheme, onHelp }) {
           } catch {
             setFeedback({
               type: 'error',
-              text: 'Logout nahi hua. Backend check karke dobara try karein.',
+              text: 'Sign out failed. Please try again.',
             })
           }
         }}
@@ -658,8 +641,8 @@ export default function Account({ onBack, isDark, onToggleTheme, onHelp }) {
                     <span className="h-px flex-1 bg-[#efedeb]" />
                   </div>
 
-                  {import.meta.env.VITE_GOOGLE_CLIENT_ID ? (
-                    <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
+                  {GOOGLE_CLIENT_ID ? (
+                    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
                       <div className="flex justify-center">
                         <GoogleLogin
                           onSuccess={handleGoogle}

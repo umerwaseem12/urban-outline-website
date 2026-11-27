@@ -11,7 +11,7 @@ const MAX_SAVED_MESSAGES = 50
 const WELCOME_MESSAGE = {
   id: 'welcome',
   role: 'assistant',
-  text: 'Assalamualaikum! Welcome to Urban Outline. Main aapki shopping mein help karne ke liye yahan hoon.',
+  text: 'Assalamualaikum! Welcome to Urban Outline. How can I help you with your shopping today?',
 }
 
 function createMessageId() {
@@ -187,7 +187,7 @@ export default function ChatAssistant({ products = [], onOpenProduct }) {
         throw new Error(
           result.message ||
           result.error ||
-          'Assistant se connection nahi ho saka. Dobara try karein.',
+          'Could not reach the assistant. Please try again.',
         )
       }
 
@@ -202,9 +202,9 @@ export default function ChatAssistant({ products = [], onOpenProduct }) {
     } catch (error) {
       const friendlyText =
         error instanceof TypeError
-          ? 'Assistant se connection nahi ho saka. Internet aur backend check karke dobara try karein.'
+          ? 'Could not reach the assistant. Please check your connection and try again.'
           : error.message ||
-            'Assistant se connection nahi ho saka. Dobara try karein.'
+            'Could not reach the assistant. Please try again.'
 
       setMessages((current) => [
         ...current.map((message) =>
@@ -365,8 +365,8 @@ export default function ChatAssistant({ products = [], onOpenProduct }) {
             </form>
 
             {/* <p className="px-4 pb-3 text-center text-[10px] text-[var(--muted)]">
-              Passwords ya sensitive information chat mein share na karein.
-              Jawab dene ke liye aapke messages Google Gemini ko bheje jate hain.
+              Please do not share passwords or sensitive information in chat.
+              Your messages are sent to Google Gemini to generate replies.
             </p> */}
           </motion.section>
         )}

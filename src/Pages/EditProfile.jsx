@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { API_BASE } from '../config'
 
 export default function EditProfile({ user, setUser, isDark }) {
   const [editing, setEditing] = useState(false)
